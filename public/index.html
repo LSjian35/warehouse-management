@@ -1,0 +1,608 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LSjian35的仓库</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Microsoft YaHei', Arial, sans-serif;
+            background: #f5f5dc;
+            height: 100vh;
+            overflow: hidden;
+        }
+        .header {
+            background: #2c3e50;
+            color: white;
+            padding: 12px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .header h1 { font-size: 20px; }
+        .admin-btn {
+            background: white;
+            color: #2c3e50;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        .admin-btn:hover { background: #f0f0f0; }
+        .container {
+            display: flex;
+            height: calc(100vh - 50px);
+        }
+        .sidebar {
+            width: 260px;
+            background: #fff;
+            border-right: 1px solid #ddd;
+            overflow-y: auto;
+            padding: 10px;
+        }
+        .project-item {
+            padding: 10px 12px;
+            cursor: pointer;
+            border-radius: 6px;
+            margin-bottom: 4px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .project-item:hover { background: #f0f0f0; }
+        .project-item.active { background: #e3f2fd; }
+        .project-item .icon { font-size: 18px; }
+        .folder-list {
+            margin-left: 20px;
+            margin-top: 4px;
+        }
+        .folder-item {
+            padding: 6px 10px;
+            cursor: pointer;
+            border-radius: 4px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 14px;
+        }
+        .folder-item:hover { background: #f5f5f5; }
+        .folder-item.active { background: #e3f2fd; }
+        .main-content {
+            flex: 1;
+            padding: 20px;
+            overflow-y: auto;
+        }
+        .toolbar {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+        .toolbar button {
+            padding: 8px 16px;
+            border: 1px solid #ddd;
+            background: white;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        .toolbar button:hover { background: #f5f5f5; }
+        .toolbar button.primary { background: #2196F3; color: white; border-color: #2196F3; }
+        .toolbar button.primary:hover { background: #1976D2; }
+        .items-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+            gap: 16px;
+        }
+        .item-card {
+            background: white;
+            border: 1px solid #e0e0e0;
+            border-radius: 10px;
+            padding: 16px;
+            cursor: pointer;
+            text-align: center;
+            transition: all 0.2s;
+            position: relative;
+        }
+        .item-card:hover { box-shadow: 0 4px 12px rgba(0,0,0,0.1); transform: translateY(-2px); }
+        .item-card.selected { border-color: #2196F3; background: #e3f2fd; }
+        .item-card .item-icon { font-size: 40px; margin-bottom: 8px; }
+        .item-card .item-name { font-size: 14px; word-break: break-all; }
+        .item-card .item-size { font-size: 12px; color: #999; margin-top: 4px; }
+        .context-menu {
+            position: fixed;
+            background: white;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            padding: 6px 0;
+            z-index: 1000;
+            min-width: 160px;
+            display: none;
+        }
+        .context-menu-item {
+            padding: 10px 16px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        .context-menu-item:hover { background: #f5f5f5; }
+        .context-menu-item.delete { color: #f44336; }
+        .modal-overlay {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.5);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 2000;
+        }
+        .modal-overlay.active { display: flex; }
+        .modal {
+            background: white;
+            padding: 24px;
+            border-radius: 12px;
+            min-width: 320px;
+        }
+        .modal h3 { margin-bottom: 16px; }
+        .modal input {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            margin-bottom: 16px;
+            font-size: 14px;
+        }
+        .modal .modal-buttons {
+            display: flex;
+            gap: 10px;
+            justify-content: flex-end;
+        }
+        .modal button {
+            padding: 8px 16px;
+            border: 1px solid #ddd;
+            background: white;
+            border-radius: 6px;
+            cursor: pointer;
+        }
+        .modal button.confirm { background: #2196F3; color: white; border-color: #2196F3; }
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: #999;
+        }
+        .empty-state .icon { font-size: 64px; margin-bottom: 16px; }
+        .breadcrumb {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 16px;
+            font-size: 14px;
+            color: #666;
+        }
+        .breadcrumb span { cursor: pointer; }
+        .breadcrumb span:hover { color: #2196F3; }
+        .hidden { display: none !important; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>📦 LSjian35的仓库</h1>
+        <button class="admin-btn" id="adminBtn">管理员模式</button>
+    </div>
+    <div class="container">
+        <div class="sidebar" id="sidebar"></div>
+        <div class="main-content">
+            <div class="breadcrumb" id="breadcrumb"></div>
+            <div class="toolbar" id="toolbar"></div>
+            <div class="items-grid" id="itemsGrid"></div>
+        </div>
+    </div>
+
+    <div class="context-menu" id="contextMenu">
+        <div class="context-menu-item" data-action="addFile">📄 添加文件</div>
+        <div class="context-menu-item" data-action="addFolder">📁 添加文件夹</div>
+        <div class="context-menu-item" data-action="addProject">📦 添加项目</div>
+        <div class="context-menu-item" data-action="multiSelect">☑️ 多选</div>
+        <div class="context-menu-item delete" data-action="delete">🗑️ 删除</div>
+    </div>
+
+    <div class="modal-overlay" id="modalOverlay">
+        <div class="modal" id="modal">
+            <h3 id="modalTitle">标题</h3>
+            <input type="text" id="modalInput" placeholder="请输入名称">
+            <input type="password" id="modalPassword" class="hidden" placeholder="请输入密码">
+            <input type="file" id="modalFile" class="hidden">
+            <div class="modal-buttons">
+                <button onclick="closeModal()">取消</button>
+                <button class="confirm" onclick="confirmModal()">确定</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = '';
+        let isAdmin = localStorage.getItem('warehouse_admin') === 'true';
+        let currentProject = null;
+        let currentFolder = null;
+        let selectedItems = [];
+        let modalCallback = null;
+        let contextTarget = null;
+        let modalMode = 'input';
+
+        document.addEventListener('DOMContentLoaded', () => {
+            updateAdminUI();
+            loadProjects();
+            setupEventListeners();
+        });
+
+        function setupEventListeners() {
+            const adminBtn = document.getElementById('adminBtn');
+            adminBtn.addEventListener('click', () => {
+                if (isAdmin) return;
+                showPasswordModal('请输入管理员密码', (pwd) => {
+                    if (pwd === '59880723') {
+                        isAdmin = true;
+                        localStorage.setItem('warehouse_admin', 'true');
+                        updateAdminUI();
+                        showToast('已进入管理员模式');
+                    } else {
+                        showToast('密码错误', 'error');
+                    }
+                });
+            });
+            adminBtn.addEventListener('contextmenu', (e) => {
+                e.preventDefault();
+                if (isAdmin) {
+                    showConfirmModal('确定要退出管理员模式吗?', () => {
+                        isAdmin = false;
+                        localStorage.removeItem('warehouse_admin');
+                        updateAdminUI();
+                    });
+                }
+            });
+
+            document.addEventListener('click', () => {
+                document.getElementById('contextMenu').style.display = 'none';
+            });
+
+            document.getElementById('modalFile').addEventListener('change', handleFileSelect);
+        }
+
+        function updateAdminUI() {
+            const adminBtn = document.getElementById('adminBtn');
+            const toolbar = document.getElementById('toolbar');
+            if (isAdmin) {
+                adminBtn.textContent = '管理员模式 (已登录)';
+                adminBtn.style.background = '#4CAF50';
+                adminBtn.style.color = 'white';
+                toolbar.innerHTML = `
+                    <button class="primary" onclick="showAddProject()">📦 添加项目</button>
+                    <button onclick="showAddFolder()">📁 添加文件夹</button>
+                    <button onclick="showAddFile()">📄 添加文件</button>
+                    <button onclick="deleteSelected()">🗑️ 删除选中</button>
+                `;
+            } else {
+                adminBtn.textContent = '管理员模式';
+                adminBtn.style.background = 'white';
+                adminBtn.style.color = '#2c3e50';
+                toolbar.innerHTML = '';
+            }
+        }
+
+        async function apiGet(url) {
+            const res = await fetch(API_BASE + url);
+            return res.json();
+        }
+        async function apiPost(url, data) {
+            const res = await fetch(API_BASE + url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            });
+            return res.json();
+        }
+        async function apiDelete(url) {
+            const res = await fetch(API_BASE + url, { method: 'DELETE' });
+            return res.json();
+        }
+
+        async function loadProjects() {
+            const projects = await apiGet('/api/projects');
+            const sidebar = document.getElementById('sidebar');
+            sidebar.innerHTML = '';
+            projects.forEach(p => {
+                const div = document.createElement('div');
+                div.className = 'project-item' + (currentProject === p.id ? ' active' : '');
+                div.innerHTML = `<span class="icon">📦</span><span>${escapeHtml(p.name)}</span>`;
+                div.onclick = () => selectProject(p.id);
+                div.oncontextmenu = (e) => showContextMenu(e, 'project', p.id);
+                sidebar.appendChild(div);
+            });
+            if (currentProject) {
+                loadFolders(currentProject);
+                loadFiles(currentProject, 'project');
+            } else {
+                showEmptyState();
+            }
+        }
+
+        async function loadFolders(projectId) {
+            const folders = await apiGet(`/api/projects/${projectId}/folders`);
+            const activeProject = document.querySelector('.project-item.active');
+            if (!activeProject) return;
+            let folderList = activeProject.querySelector('.folder-list');
+            if (!folderList) {
+                folderList = document.createElement('div');
+                folderList.className = 'folder-list';
+                activeProject.appendChild(folderList);
+            }
+            folderList.innerHTML = '';
+            folders.forEach(f => {
+                const div = document.createElement('div');
+                div.className = 'folder-item' + (currentFolder === f.id ? ' active' : '');
+                div.innerHTML = `<span class="icon">📁</span><span>${escapeHtml(f.name)}</span>`;
+                div.onclick = (e) => { e.stopPropagation(); selectFolder(f.id); };
+                div.oncontextmenu = (e) => { e.stopPropagation(); showContextMenu(e, 'folder', f.id); };
+                folderList.appendChild(div);
+            });
+        }
+
+        async function loadFiles(parentId, parentType) {
+            const files = await apiGet(`/api/files?parent_id=${parentId}&parent_type=${parentType}`);
+            const grid = document.getElementById('itemsGrid');
+            grid.innerHTML = '';
+            files.forEach(f => {
+                const card = document.createElement('div');
+                card.className = 'item-card';
+                card.dataset.id = f.id;
+                card.dataset.type = 'file';
+                const icon = getFileIcon(f.type);
+                card.innerHTML = `
+                    <div class="item-icon">${icon}</div>
+                    <div class="item-name">${escapeHtml(f.name)}</div>
+                    <div class="item-size">${formatSize(f.size)}</div>
+                `;
+                card.onclick = () => toggleSelect(card, f.id, 'file');
+                card.ondblclick = () => downloadFile(f.id);
+                card.oncontextmenu = (e) => showContextMenu(e, 'file', f.id);
+                grid.appendChild(card);
+            });
+            updateBreadcrumb();
+        }
+
+        function selectProject(id) {
+            currentProject = id;
+            currentFolder = null;
+            loadProjects();
+        }
+
+        function selectFolder(id) {
+            currentFolder = id;
+            loadProjects();
+            loadFiles(id, 'folder');
+        }
+
+        function showEmptyState() {
+            document.getElementById('itemsGrid').innerHTML = `
+                <div class="empty-state" style="grid-column: 1 / -1;">
+                    <div class="icon">📦</div>
+                    <p>请选择一个项目或文件夹</p>
+                </div>
+            `;
+            document.getElementById('breadcrumb').innerHTML = '';
+        }
+
+        function updateBreadcrumb() {
+            const bc = document.getElementById('breadcrumb');
+            if (!currentProject) { bc.innerHTML = ''; return; }
+            const projectName = document.querySelector('.project-item.active')?.textContent?.replace('📦', '') || '项目';
+            let html = `<span onclick="currentFolder=null;loadProjects();">📦 ${escapeHtml(projectName)}</span>`;
+            if (currentFolder) {
+                const folderName = document.querySelector('.folder-item.active')?.textContent?.replace('📁', '') || '文件夹';
+                html += ` <span>/</span> <span>📁 ${escapeHtml(folderName)}</span>`;
+            }
+            bc.innerHTML = html;
+        }
+
+        function showContextMenu(e, type, id) {
+            if (!isAdmin) return;
+            e.preventDefault();
+            contextTarget = { type, id };
+            const menu = document.getElementById('contextMenu');
+            menu.style.display = 'block';
+            menu.style.left = e.pageX + 'px';
+            menu.style.top = e.pageY + 'px';
+        }
+
+        document.querySelectorAll('.context-menu-item').forEach(item => {
+            item.addEventListener('click', () => {
+                const action = item.dataset.action;
+                if (action === 'addFile') showAddFile();
+                else if (action === 'addFolder') showAddFolder();
+                else if (action === 'addProject') showAddProject();
+                else if (action === 'delete') deleteItem(contextTarget?.type, contextTarget?.id);
+                else if (action === 'multiSelect') { /* 多选模式 */ }
+            });
+        });
+
+        function showAddProject() {
+            showModal('添加项目', '', (name) => {
+                apiPost('/api/projects', { name }).then(() => loadProjects());
+            });
+        }
+
+        function showAddFolder() {
+            if (!currentProject) { alert('请先选择一个项目'); return; }
+            showModal('添加文件夹', '', (name) => {
+                apiPost('/api/folders', { name, project_id: currentProject }).then(() => loadFolders(currentProject));
+            });
+        }
+
+        function showAddFile() {
+            if (!currentProject) { alert('请先选择一个项目或文件夹'); return; }
+            document.getElementById('modalTitle').textContent = '添加文件';
+            document.getElementById('modalInput').classList.add('hidden');
+            document.getElementById('modalFile').classList.remove('hidden');
+            document.getElementById('modalOverlay').classList.add('active');
+            modalCallback = null;
+        }
+
+        async function handleFileSelect(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+            const parentId = currentFolder || currentProject;
+            const parentType = currentFolder ? 'folder' : 'project';
+            const formData = new FormData();
+            formData.append('file', file);
+            formData.append('parent_id', parentId);
+            formData.append('parent_type', parentType);
+            await fetch(API_BASE + '/api/files', { method: 'POST', body: formData });
+            closeModal();
+            loadFiles(parentId, parentType);
+        }
+
+        async function deleteItem(type, id) {
+            if (!confirm('确定要删除吗?')) return;
+            if (type === 'project') {
+                await apiDelete(`/api/projects/${id}`);
+                if (currentProject === id) { currentProject = null; currentFolder = null; }
+                loadProjects();
+            } else if (type === 'folder') {
+                await apiDelete(`/api/folders/${id}`);
+                if (currentFolder === id) currentFolder = null;
+                loadFolders(currentProject);
+                loadFiles(currentProject, 'project');
+            } else if (type === 'file') {
+                await apiDelete(`/api/files/${id}`);
+                loadFiles(currentFolder || currentProject, currentFolder ? 'folder' : 'project');
+            }
+        }
+
+        function deleteSelected() {
+            selectedItems.forEach(item => deleteItem(item.type, item.id));
+            selectedItems = [];
+        }
+
+        function toggleSelect(card, id, type) {
+            if (selectedItems.find(i => i.id === id && i.type === type)) {
+                selectedItems = selectedItems.filter(i => !(i.id === id && i.type === type));
+                card.classList.remove('selected');
+            } else {
+                selectedItems.push({ id, type });
+                card.classList.add('selected');
+            }
+        }
+
+        function downloadFile(id) {
+            window.open(API_BASE + `/api/files/${id}/download`);
+        }
+
+        function showModal(title, placeholder, callback) {
+            document.getElementById('modalTitle').textContent = title;
+            const input = document.getElementById('modalInput');
+            input.placeholder = placeholder || '请输入名称';
+            input.value = '';
+            input.classList.remove('hidden');
+            document.getElementById('modalPassword').classList.add('hidden');
+            document.getElementById('modalFile').classList.add('hidden');
+            document.getElementById('modalOverlay').classList.add('active');
+            modalCallback = callback;
+            modalMode = 'input';
+            setTimeout(() => input.focus(), 100);
+        }
+
+        function showPasswordModal(title, callback) {
+            document.getElementById('modalTitle').textContent = title;
+            document.getElementById('modalInput').classList.add('hidden');
+            document.getElementById('modalFile').classList.add('hidden');
+            const pwd = document.getElementById('modalPassword');
+            pwd.classList.remove('hidden');
+            pwd.value = '';
+            document.getElementById('modalOverlay').classList.add('active');
+            modalCallback = callback;
+            modalMode = 'password';
+            setTimeout(() => pwd.focus(), 100);
+        }
+
+        function showConfirmModal(title, callback) {
+            document.getElementById('modalTitle').textContent = title;
+            document.getElementById('modalInput').classList.add('hidden');
+            document.getElementById('modalPassword').classList.add('hidden');
+            document.getElementById('modalFile').classList.add('hidden');
+            document.getElementById('modalOverlay').classList.add('active');
+            modalCallback = callback;
+            modalMode = 'confirm';
+        }
+
+        function closeModal() {
+            document.getElementById('modalOverlay').classList.remove('active');
+            document.getElementById('modalFile').value = '';
+            modalCallback = null;
+        }
+
+        function confirmModal() {
+            if (modalMode === 'password') {
+                const pwd = document.getElementById('modalPassword');
+                if (modalCallback && pwd.value.trim()) {
+                    modalCallback(pwd.value.trim());
+                    closeModal();
+                }
+            } else if (modalMode === 'confirm') {
+                if (modalCallback) modalCallback();
+                closeModal();
+            } else {
+                const input = document.getElementById('modalInput');
+                if (modalCallback && input.value.trim()) {
+                    modalCallback(input.value.trim());
+                    closeModal();
+                }
+            }
+        }
+
+        document.getElementById('modalInput').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') confirmModal();
+        });
+        document.getElementById('modalPassword').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') confirmModal();
+        });
+
+        function showToast(message, type) {
+            const toast = document.createElement('div');
+            toast.style.cssText = `position:fixed;top:20px;left:50%;transform:translateX(-50%);padding:12px 24px;border-radius:8px;z-index:9999;font-size:14px;transition:opacity 0.3s;`;
+            toast.style.background = type === 'error' ? '#f44336' : '#4CAF50';
+            toast.style.color = 'white';
+            toast.textContent = message;
+            document.body.appendChild(toast);
+            setTimeout(() => { toast.style.opacity = '0'; setTimeout(() => toast.remove(), 300); }, 2000);
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        function formatSize(bytes) {
+            if (!bytes) return '';
+            const sizes = ['B', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(1024));
+            return (bytes / Math.pow(1024, i)).toFixed(1) + ' ' + sizes[i];
+        }
+
+        function getFileIcon(type) {
+            if (type?.startsWith('image/')) return '🖼️';
+            if (type?.startsWith('video/')) return '🎬';
+            if (type?.startsWith('audio/')) return '🎵';
+            if (type?.includes('pdf')) return '📕';
+            if (type?.includes('zip') || type?.includes('rar')) return '📦';
+            if (type?.includes('word') || type?.includes('document')) return '📝';
+            if (type?.includes('excel') || type?.includes('sheet')) return '📊';
+            if (type?.includes('powerpoint') || type?.includes('presentation')) return '📽️';
+            if (type?.includes('code') || type?.includes('javascript') || type?.includes('html')) return '💻';
+            return '📄';
+        }
+    </script>
+</body>
+</html>
