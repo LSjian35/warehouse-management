@@ -3,14 +3,19 @@ const cors = require('cors');
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
+const https = require('https');
 
 const app = express();
 const PORT = process.env.PORT || 3002;
 
-// 文件存储根目录（通过环境变量配置，Railway 部署时可用 Volume 挂载）
-const STORAGE_ROOT = process.env.STORAGE_ROOT || './storage';
+// GitHub 配置
+const GITHUB_TOKEN = process.env.GITHUB_TOKEN;
+const GITHUB_OWNER = 'LSjian35';
+const GITHUB_REPO = 'warehouse-management';
+const GITHUB_BRANCH = 'main';
 
-// 确保目录存在
+// 临时文件存储目录（用于接收上传文件后再推送到 GitHub）
+const STORAGE_ROOT = process.env.STORAGE_ROOT || './storage';
 const uploadsDir = path.join(STORAGE_ROOT, 'uploads');
 const dataDir = path.join(STORAGE_ROOT, 'data');
 if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
@@ -39,7 +44,136 @@ function saveData(data) {
     fs.writeFileSync(DATA_FILE, JSON.stringify(data, null, 2));
 }
 
-// 配置文件上传
+// GitHub API 上传文件
+function uploadToGitHub(filename, contentBase64) {
+    return new Promise((resolve, reject) => {
+        if (!GITHUB_TOKEN) {
+            return reject(new Error('GITHUB_TOKEN 未配置'));
+        }
+
+        const filePath = `files/${filename}`;
+        
+        // Step 1: 尝试获取现有文件的 SHA（用于更新已存在文件）
+        const getOptions = {
+            hostname: 'api.github.com',
+            path: `/repos/${GITHUB_OWNER}/${GITHUB_REPO}/contents/${encodeURIComponent(filePath)}?ref=${GITHUB_BRANCH}`,
+            method: 'GET',
+            headers: {
+                'Authorization': `token ${GITHUB_TOKEN}`,
+                'User-Agent': 'warehouse-app',
+                'Accept': 'application/vnd.github.v3+json'
+            }
+        };
+        
+        const getReq = https.request(getOptions, (getRes) => {
+            let body = '';
+            getRes.on('data', chunk => body += chunk);
+            getRes.on('end', () => {
+                let sha = null;
+                if (getRes.statusCode === 200) {
+                    try {
+                        const data = JSON.parse(body);
+                        sha = data.sha;
+                    } catch(e) {}
+                }
+                
+                // Step 2: 创建或更新文件
+                const payload = {
+                    message: sha ? `Update ${filename}` : `Upload ${filename}`,
+                    content: contentBase64,
+                    branch: GITHUB_BRANCH
+                };
+                if (sha) payload.sha = sha;
+                
+                const putData = JSON.stringify(payload);
+                
+                const putOptions = {
+                    hostname: 'api.github.com',
+                    path: `/repos/${GITHUB_OWNER}/${GITHUB_REPO}/contents/${encodeURIComponent(filePath)}`,
+                    method: 'PUT',
+                    headers: {
+                        'Authorization': `token ${GITHUB_TOKEN}`,
+                        'User-Agent': 'warehouse-app',
+                        'Accept': 'application/vnd.github.v3+json',
+                        'Content-Type': 'application/json',
+                        'Content-Length': Buffer.byteLength(putData)
+                    }
+                };
+                
+                const putReq = https.request(putOptions, (putRes) => {
+                    let putBody = '';
+                    putRes.on('data', chunk => putBody += chunk);
+                    putRes.on('end', () => {
+                        if (putRes.statusCode === 200 || putRes.statusCode === 201) {
+                            try {
+                                const result = JSON.parse(putBody);
+                                // 构建 raw GitHub URL
+                                const rawUrl = `https://raw.githubusercontent.com/${GITHUB_OWNER}/${GITHUB_REPO}/${GITHUB_BRANCH}/${filePath}`;
+                                resolve(rawUrl);
+                            } catch(e) {
+                                reject(new Error('解析 GitHub 响应失败'));
+                            }
+                        } else {
+                            reject(new Error(`GitHub API 错误: ${putRes.statusCode} ${putBody}`));
+                        }
+                    });
+                });
+                
+                putReq.on('error', reject);
+                putReq.write(putData);
+                putReq.end();
+            });
+        });
+        
+        getReq.on('error', (err) => {
+            // 如果 GET 失败，直接尝试创建
+            const putData = JSON.stringify({
+                message: `Upload ${filename}`,
+                content: contentBase64,
+                branch: GITHUB_BRANCH
+            });
+            
+            const putOptions = {
+                hostname: 'api.github.com',
+                path: `/repos/${GITHUB_OWNER}/${GITHUB_REPO}/contents/${encodeURIComponent(filePath)}`,
+                method: 'PUT',
+                headers: {
+                    'Authorization': `token ${GITHUB_TOKEN}`,
+                    'User-Agent': 'warehouse-app',
+                    'Accept': 'application/vnd.github.v3+json',
+                    'Content-Type': 'application/json',
+                    'Content-Length': Buffer.byteLength(putData)
+                }
+            };
+            
+            const putReq = https.request(putOptions, (putRes) => {
+                let putBody = '';
+                putRes.on('data', chunk => putBody += chunk);
+                putRes.on('end', () => {
+                    if (putRes.statusCode === 200 || putRes.statusCode === 201) {
+                        try {
+                            const result = JSON.parse(putBody);
+                            const rawUrl = `https://raw.githubusercontent.com/${GITHUB_OWNER}/${GITHUB_REPO}/${GITHUB_BRANCH}/${filePath}`;
+                            resolve(rawUrl);
+                        } catch(e) {
+                            reject(new Error('解析 GitHub 响应失败'));
+                        }
+                    } else {
+                        reject(new Error(`GitHub API 错误: ${putRes.statusCode} ${putBody}`));
+                    }
+                });
+            });
+            
+            putReq.on('error', reject);
+            putReq.write(putData);
+            putReq.end();
+        });
+        
+        getReq.end();
+    });
+}
+
+// 配置文件上传（临时存储到本地，然后推送到 GitHub）
 const storage = multer.diskStorage({
     destination: function (req, file, cb) {
         cb(null, uploadsDir);
@@ -55,7 +189,6 @@ const upload = multer({ storage: storage });
 app.use(cors());
 app.use(express.json());
 app.use(express.static('public'));
-app.use('/uploads', express.static(uploadsDir));
 
 // ===== API 路由 =====
 
@@ -83,20 +216,6 @@ app.post('/api/projects', (req, res) => {
 app.delete('/api/projects/:id', (req, res) => {
     const data = initData();
     const projectId = parseInt(req.params.id);
-    
-    const filesToDelete = data.files.filter(f => f.parent_id === projectId && f.parent_type === 'project');
-    filesToDelete.forEach(f => {
-        if (fs.existsSync(f.path)) fs.unlinkSync(f.path);
-    });
-    
-    const foldersToDelete = data.folders.filter(f => f.project_id === projectId);
-    foldersToDelete.forEach(folder => {
-        const folderFiles = data.files.filter(f => f.parent_id === folder.id && f.parent_type === 'folder');
-        folderFiles.forEach(f => {
-            if (fs.existsSync(f.path)) fs.unlinkSync(f.path);
-        });
-        data.files = data.files.filter(f => !(f.parent_id === folder.id && f.parent_type === 'folder'));
-    });
     
     data.files = data.files.filter(f => !(f.parent_id === projectId && f.parent_type === 'project'));
     data.folders = data.folders.filter(f => f.project_id !== projectId);
@@ -134,11 +253,6 @@ app.delete('/api/folders/:id', (req, res) => {
     const data = initData();
     const folderId = parseInt(req.params.id);
     
-    const filesToDelete = data.files.filter(f => f.parent_id === folderId && f.parent_type === 'folder');
-    filesToDelete.forEach(f => {
-        if (fs.existsSync(f.path)) fs.unlinkSync(f.path);
-    });
-    
     data.files = data.files.filter(f => !(f.parent_id === folderId && f.parent_type === 'folder'));
     data.folders = data.folders.filter(f => f.id !== folderId);
     
@@ -155,34 +269,56 @@ app.get('/api/files', (req, res) => {
     res.json(files);
 });
 
-// 上传文件
-app.post('/api/files', upload.single('file'), (req, res) => {
-    const data = initData();
-    const { parent_id, parent_type } = req.body;
+// 上传文件 -> 推送到 GitHub
+app.post('/api/files', upload.single('file'), async (req, res) => {
     const file = req.file;
-    
     if (!file) {
         return res.status(400).json({ error: '没有上传文件' });
     }
     
-    const fileRecord = {
-        id: data.nextId.file++,
-        name: file.originalname,
-        original_name: file.originalname,
-        path: file.path,
-        size: file.size,
-        type: file.mimetype,
-        parent_id: parseInt(parent_id),
-        parent_type: parent_type,
-        created_at: new Date().toISOString()
-    };
+    if (!GITHUB_TOKEN) {
+        return res.status(500).json({ error: 'GITHUB_TOKEN 未配置，请在 Railway 环境变量中设置' });
+    }
     
-    data.files.push(fileRecord);
-    saveData(data);
-    res.json(fileRecord);
+    try {
+        const fileContent = fs.readFileSync(file.path);
+        const base64Content = fileContent.toString('base64');
+        
+        const downloadUrl = await uploadToGitHub(file.originalname, base64Content);
+        
+        // 删除临时文件
+        try {
+            fs.unlinkSync(file.path);
+        } catch(e) {}
+        
+        const data = initData();
+        const { parent_id, parent_type } = req.body;
+        const fileRecord = {
+            id: data.nextId.file++,
+            name: file.originalname,
+            original_name: file.originalname,
+            url: downloadUrl,
+            size: file.size,
+            type: file.mimetype,
+            parent_id: parseInt(parent_id),
+            parent_type: parent_type,
+            created_at: new Date().toISOString()
+        };
+        
+        data.files.push(fileRecord);
+        saveData(data);
+        res.json(fileRecord);
+    } catch (err) {
+        console.error('GitHub 上传错误:', err);
+        // 删除临时文件
+        try {
+            fs.unlinkSync(file.path);
+        } catch(e) {}
+        res.status(500).json({ error: '上传到 GitHub 失败', details: err.message });
+    }
 });
 
-// 下载文件
+// 下载文件 -> 重定向到 GitHub raw 链接
 app.get('/api/files/:id/download', (req, res) => {
     const data = initData();
     const fileId = parseInt(req.params.id);
@@ -192,22 +328,17 @@ app.get('/api/files/:id/download', (req, res) => {
         return res.status(404).json({ error: '文件不存在' });
     }
     
-    if (!fs.existsSync(file.path)) {
-        return res.status(404).json({ error: '文件已被删除' });
+    if (file.url) {
+        res.redirect(file.url);
+    } else {
+        res.status(404).json({ error: '文件链接不可用' });
     }
-    
-    res.download(file.path, file.original_name);
 });
 
-// 删除文件
+// 删除文件 -> 只删除本地记录（GitHub 文件保留，永久可用）
 app.delete('/api/files/:id', (req, res) => {
     const data = initData();
     const fileId = parseInt(req.params.id);
-    const file = data.files.find(f => f.id === fileId);
-    
-    if (file && fs.existsSync(file.path)) {
-        fs.unlinkSync(file.path);
-    }
     
     data.files = data.files.filter(f => f.id !== fileId);
     saveData(data);
@@ -217,4 +348,5 @@ app.delete('/api/files/:id', (req, res) => {
 // 启动服务器
 app.listen(PORT, () => {
     console.log(`服务器运行在 http://localhost:${PORT}`);
+    console.log(`GITHUB_TOKEN 状态: ${GITHUB_TOKEN ? '已配置' : '未配置'}`);
 });
