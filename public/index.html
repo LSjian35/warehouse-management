@@ -330,38 +330,46 @@
                 sidebar.appendChild(div);
             });
             if (currentProject) {
-                loadFolders(currentProject);
-                loadFiles(currentProject, 'project');
+                loadProjectContents(currentProject);
             } else {
                 showEmptyState();
             }
         }
 
-        async function loadFolders(projectId) {
-            const folders = await apiGet(`/api/projects/${projectId}/folders`);
-            const activeProject = document.querySelector('.project-item.active');
-            if (!activeProject) return;
-            let folderList = activeProject.querySelector('.folder-list');
-            if (!folderList) {
-                folderList = document.createElement('div');
-                folderList.className = 'folder-list';
-                activeProject.appendChild(folderList);
-            }
-            folderList.innerHTML = '';
-            folders.forEach(f => {
-                const div = document.createElement('div');
-                div.className = 'folder-item' + (currentFolder === f.id ? ' active' : '');
-                div.innerHTML = `<span class="icon">📁</span><span>${escapeHtml(f.name)}</span>`;
-                div.onclick = (e) => { e.stopPropagation(); selectFolder(f.id); };
-                div.oncontextmenu = (e) => { e.stopPropagation(); showContextMenu(e, 'folder', f.id); };
-                folderList.appendChild(div);
-            });
-        }
-
-        async function loadFiles(parentId, parentType) {
-            const files = await apiGet(`/api/files?parent_id=${parentId}&parent_type=${parentType}`);
+        async function loadProjectContents(projectId) {
             const grid = document.getElementById('itemsGrid');
             grid.innerHTML = '';
+            
+            // 先加载文件夹
+            const folders = await apiGet(`/api/projects/${projectId}/folders`);
+            folders.forEach(f => {
+                const card = document.createElement('div');
+                card.className = 'item-card';
+                card.dataset.id = f.id;
+                card.dataset.type = 'folder';
+                card.innerHTML = `
+                    <div class="item-icon">📁</div>
+                    <div class="item-name">${escapeHtml(f.name)}</div>
+                `;
+                card.onclick = () => selectFolder(f.id);
+                card.oncontextmenu = (e) => showContextMenu(e, 'folder', f.id);
+                grid.appendChild(card);
+            });
+            
+            // 再加载项目根目录下的文件
+            await loadFilesToGrid(projectId, 'project', grid);
+            updateBreadcrumb();
+        }
+
+        async function loadFolderContents(folderId) {
+            const grid = document.getElementById('itemsGrid');
+            grid.innerHTML = '';
+            await loadFilesToGrid(folderId, 'folder', grid);
+            updateBreadcrumb();
+        }
+
+        async function loadFilesToGrid(parentId, parentType, grid) {
+            const files = await apiGet(`/api/files?parent_id=${parentId}&parent_type=${parentType}`);
             files.forEach(f => {
                 const card = document.createElement('div');
                 card.className = 'item-card';
@@ -377,7 +385,6 @@
                 card.oncontextmenu = (e) => showContextMenu(e, 'file', f.id);
                 grid.appendChild(card);
             });
-            updateBreadcrumb();
         }
 
         function selectProject(id) {
@@ -388,8 +395,7 @@
 
         function selectFolder(id) {
             currentFolder = id;
-            loadProjects();
-            loadFiles(id, 'folder');
+            loadFolderContents(id);
         }
 
         function showEmptyState() {
@@ -401,10 +407,16 @@
             const bc = document.getElementById('breadcrumb');
             if (!currentProject) { bc.innerHTML = ''; return; }
             const projectName = document.querySelector('.project-item.active')?.textContent?.replace('📦', '') || '项目';
-            let html = `<span onclick="currentFolder=null;loadProjects();">📦 ${escapeHtml(projectName)}</span>`;
+            let html = `<span onclick="currentFolder=null;loadProjectContents(currentProject);">📦 ${escapeHtml(projectName)}</span>`;
             if (currentFolder) {
-                const folderName = document.querySelector('.folder-item.active')?.textContent?.replace('📁', '') || '文件夹';
-                html += ` <span>/</span> <span>📁 ${escapeHtml(folderName)}</span>`;
+                // 从数据中查找文件夹名称
+                fetch(`/api/projects/${currentProject}/folders`).then(r=>r.json()).then(folders=>{
+                    const folder = folders.find(f=>f.id===currentFolder);
+                    const folderName = folder ? folder.name : '文件夹';
+                    html += ` <span>/</span> <span>📁 ${escapeHtml(folderName)}</span>`;
+                    bc.innerHTML = html;
+                });
+                return;
             }
             bc.innerHTML = html;
         }
@@ -439,7 +451,7 @@
         function showAddFolder() {
             if (!currentProject) { alert('请先选择一个项目'); return; }
             showModal('添加文件夹', '', (name) => {
-                apiPost('/api/folders', { name, project_id: currentProject }).then(() => loadFolders(currentProject));
+                apiPost('/api/folders', { name, project_id: currentProject }).then(() => loadProjectContents(currentProject));
             });
         }
 
@@ -463,7 +475,11 @@
             formData.append('parent_type', parentType);
             await fetch(API_BASE + '/api/files', { method: 'POST', body: formData });
             closeModal();
-            loadFiles(parentId, parentType);
+            if (currentFolder) {
+                loadFolderContents(currentFolder);
+            } else {
+                loadProjectContents(currentProject);
+            }
         }
 
         async function deleteItem(type, id) {
@@ -475,11 +491,14 @@
             } else if (type === 'folder') {
                 await apiDelete(`/api/folders/${id}`);
                 if (currentFolder === id) currentFolder = null;
-                loadFolders(currentProject);
-                loadFiles(currentProject, 'project');
+                loadProjectContents(currentProject);
             } else if (type === 'file') {
                 await apiDelete(`/api/files/${id}`);
-                loadFiles(currentFolder || currentProject, currentFolder ? 'folder' : 'project');
+                if (currentFolder) {
+                    loadFolderContents(currentFolder);
+                } else {
+                    loadProjectContents(currentProject);
+                }
             }
         }
 
