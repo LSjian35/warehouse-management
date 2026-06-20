@@ -4,7 +4,7 @@
 
 一个基于 Express + Node.js 的仓库管理系统，支持项目/文件夹/文件的分层管理，可上传、下载、删除文件。前端为纯 HTML/CSS/JS，后端提供 REST API。
 
-管理员密码：`59880723`（可在 `public/index.html` 中修改）
+管理员密码：`****`（可在 `public/index.html` 中修改）
 
 ---
 
