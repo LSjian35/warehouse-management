@@ -345,6 +345,17 @@ app.delete('/api/files/:id', (req, res) => {
     res.json({ message: '文件已删除' });
 });
 
+// 管理员登录验证（密码不暴露在前端）
+app.post('/api/admin/login', (req, res) => {
+    const { password } = req.body;
+    const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || '59880723';
+    if (password === ADMIN_PASSWORD) {
+        res.json({ success: true });
+    } else {
+        res.json({ success: false });
+    }
+});
+
 // 启动服务器
 app.listen(PORT, () => {
     console.log(`服务器运行在 http://localhost:${PORT}`);

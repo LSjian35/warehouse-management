@@ -204,7 +204,6 @@
         <div class="context-menu-item" data-action="addFile">📄 添加文件</div>
         <div class="context-menu-item" data-action="addFolder">📁 添加文件夹</div>
         <div class="context-menu-item" data-action="addProject">📦 添加项目</div>
-        <div class="context-menu-item" data-action="multiSelect">☑️ 多选</div>
         <div class="context-menu-item delete" data-action="delete">🗑️ 删除</div>
     </div>
 
@@ -239,16 +238,26 @@
 
         function setupEventListeners() {
             const adminBtn = document.getElementById('adminBtn');
-            adminBtn.addEventListener('click', () => {
+            adminBtn.addEventListener('click', async () => {
                 if (isAdmin) return;
-                showPasswordModal('请输入管理员密码', (pwd) => {
-                    if (pwd === '59880723') {
-                        isAdmin = true;
-                        localStorage.setItem('warehouse_admin', 'true');
-                        updateAdminUI();
-                        showToast('已进入管理员模式');
-                    } else {
-                        showToast('密码错误', 'error');
+                showPasswordModal('请输入管理员密码', async (pwd) => {
+                    try {
+                        const res = await fetch('/api/admin/login', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ password: pwd })
+                        });
+                        const result = await res.json();
+                        if (result.success) {
+                            isAdmin = true;
+                            localStorage.setItem('warehouse_admin', 'true');
+                            updateAdminUI();
+                            showToast('已进入管理员模式');
+                        } else {
+                            showToast('密码错误', 'error');
+                        }
+                    } catch (e) {
+                        showToast('验证失败', 'error');
                     }
                 });
             });
@@ -362,7 +371,6 @@
                 card.innerHTML = `
                     <div class="item-icon">${icon}</div>
                     <div class="item-name">${escapeHtml(f.name)}</div>
-                    <div class="item-size">${formatSize(f.size)}</div>
                 `;
                 card.onclick = () => toggleSelect(card, f.id, 'file');
                 card.ondblclick = () => downloadFile(f.id);
@@ -385,12 +393,7 @@
         }
 
         function showEmptyState() {
-            document.getElementById('itemsGrid').innerHTML = `
-                <div class="empty-state" style="grid-column: 1 / -1;">
-                    <div class="icon">📦</div>
-                    <p>请选择一个项目或文件夹</p>
-                </div>
-            `;
+            document.getElementById('itemsGrid').innerHTML = '';
             document.getElementById('breadcrumb').innerHTML = '';
         }
 
