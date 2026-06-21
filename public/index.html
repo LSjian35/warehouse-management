@@ -425,6 +425,292 @@
         .hidden { display: none !important; }
         .loading-spin { animation: spin 1s linear infinite; }
         @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+
+        /* ===== 个性化设置面板 ===== */
+        .personal-overlay {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.5);
+            z-index: 2000;
+            justify-content: center;
+            align-items: center;
+        }
+        .personal-overlay.show { display: flex; }
+        .personal-panel {
+            width: 400px;
+            max-height: 80vh;
+            background: white;
+            border: 1px solid var(--border-light);
+            border-radius: 12px;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        }
+        .personal-header {
+            padding: 16px 20px;
+            border-bottom: 1px solid var(--border-light);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .personal-header h2 {
+            font-size: 16px;
+            font-weight: 600;
+            color: var(--text);
+            margin: 0;
+        }
+        .personal-close {
+            width: 28px; height: 28px;
+            border-radius: 6px;
+            border: none;
+            background: transparent;
+            color: var(--text-secondary);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+            transition: all 0.2s;
+        }
+        .personal-close:hover {
+            background: var(--hover);
+            color: var(--text);
+        }
+        .personal-body {
+            padding: 12px 20px;
+            overflow-y: auto;
+        }
+        .personal-section {
+            margin-bottom: 20px;
+        }
+        .personal-section:last-child { margin-bottom: 0; }
+        .personal-label {
+            font-size: 11px;
+            font-weight: 600;
+            color: var(--text-secondary);
+            margin-bottom: 8px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .personal-options {
+            display: flex;
+            gap: 6px;
+            flex-wrap: wrap;
+        }
+        .personal-option {
+            padding: 6px 14px;
+            border-radius: 6px;
+            border: 1px solid var(--border-light);
+            background: white;
+            color: var(--text-secondary);
+            font-size: 13px;
+            cursor: pointer;
+            transition: all 0.2s;
+            user-select: none;
+        }
+        .personal-option:hover {
+            border-color: var(--accent);
+            color: var(--text);
+        }
+        .personal-option.active {
+            background: var(--selected);
+            border-color: var(--accent);
+            color: var(--accent);
+            font-weight: 600;
+        }
+        .personal-option .preview-dot {
+            display: inline-block;
+            width: 10px; height: 10px;
+            border-radius: 50%;
+            margin-right: 6px;
+            border: 1px solid var(--border-light);
+        }
+
+        /* ===== 主题变量 ===== */
+        body.theme-dark {
+            --bg: #0f1115;
+            --sidebar-bg: #161b22;
+            --header-bg: #1c2128;
+            --border: #30363d;
+            --border-light: #21262d;
+            --accent: #58a6ff;
+            --accent-hover: #79b8ff;
+            --selected: rgba(88,166,255,0.15);
+            --selected-border: #58a6ff;
+            --hover: #21262d;
+            --text: #e6edf3;
+            --text-secondary: #8b949e;
+            --text-light: #6e7681;
+            --toolbar-bg: #161b22;
+            --status-bg: #0d1117;
+        }
+        body.theme-dark .sidebar { background: var(--sidebar-bg); border-right-color: var(--border); }
+        body.theme-dark .main-content { background: var(--bg); }
+        body.theme-dark .toolbar { background: var(--toolbar-bg); border-bottom-color: var(--border); }
+        body.theme-dark .status-bar { background: var(--status-bg); border-top-color: var(--border); }
+        body.theme-dark .address-bar { background: #21262d; border-color: var(--border); }
+        body.theme-dark .items-grid { gap: 12px; }
+        body.theme-dark .details-view thead { background: #161b22; }
+        body.theme-dark .details-view th { border-bottom-color: var(--border); color: var(--text-secondary); }
+        body.theme-dark .details-view td { border-bottom-color: var(--border-light); }
+        body.theme-dark .details-view tbody tr:hover { background: var(--hover); }
+        body.theme-dark .item-card { background: var(--sidebar-bg); border-color: var(--border); }
+        body.theme-dark .item-card:hover { box-shadow: 0 4px 12px rgba(0,0,0,0.3); }
+        body.theme-dark .item-card.selected { border-color: var(--accent); background: var(--selected); }
+        body.theme-dark .icon-item { background: var(--sidebar-bg); border-color: var(--border); }
+        body.theme-dark .list-item:hover { background: var(--hover); }
+        body.theme-dark .empty-state { color: var(--text-secondary); }
+        body.theme-dark .context-menu { background: var(--sidebar-bg); border-color: var(--border); }
+        body.theme-dark .context-menu-item:hover { background: var(--hover); }
+        body.theme-dark .modal { background: var(--sidebar-bg); }
+        body.theme-dark .modal-header { color: var(--text); }
+        body.theme-dark .modal-body input { background: var(--bg); border-color: var(--border); color: var(--text); }
+        body.theme-dark .search-box { background: var(--bg); border-color: var(--border); color: var(--text); }
+        body.theme-dark .view-toggle { border-color: var(--border); }
+        body.theme-dark .view-btn { background: var(--sidebar-bg); color: var(--text-secondary); }
+        body.theme-dark .view-btn.active { background: var(--selected); color: var(--accent); }
+        body.theme-dark .nav-btn:hover:not(:disabled) { background: var(--hover); }
+        body.theme-dark .toolbar-btn { background: var(--sidebar-bg); border-color: var(--border); color: var(--text); }
+        body.theme-dark .toolbar-btn:hover { background: var(--hover); }
+        body.theme-dark .tree-item:hover { background: var(--hover); }
+        body.theme-dark .tree-item.active { background: var(--selected); border-color: var(--accent); }
+        body.theme-dark .personal-panel { background: var(--sidebar-bg); border-color: var(--border); }
+        body.theme-dark .personal-header { border-bottom-color: var(--border); }
+        body.theme-dark .personal-header h2 { color: var(--text); }
+        body.theme-dark .personal-option { background: var(--bg); border-color: var(--border); color: var(--text-secondary); }
+        body.theme-dark .personal-option:hover { border-color: var(--accent); color: var(--text); }
+        body.theme-dark .personal-option.active { background: var(--selected); border-color: var(--accent); color: var(--accent); }
+        body.theme-dark .personal-close { color: var(--text-secondary); }
+        body.theme-dark .personal-close:hover { background: var(--hover); color: var(--text); }
+
+        body.theme-light {
+            --bg: #f6f8fa;
+            --sidebar-bg: #ffffff;
+            --header-bg: #2563eb;
+            --border: #d1d5db;
+            --border-light: #e5e7eb;
+            --accent: #2563eb;
+            --accent-hover: #1d4ed8;
+            --selected: #dbeafe;
+            --selected-border: #60a5fa;
+            --hover: #eff6ff;
+            --text: #1f2937;
+            --text-secondary: #6b7280;
+            --text-light: #9ca3af;
+            --toolbar-bg: #ffffff;
+            --status-bg: #f3f4f6;
+        }
+
+        body.theme-mint {
+            --bg: #0d1f1a;
+            --sidebar-bg: #142b24;
+            --header-bg: #1a362e;
+            --border: #2d5a4e;
+            --border-light: #1a3d33;
+            --accent: #4ade80;
+            --accent-hover: #22c55e;
+            --selected: rgba(74,222,128,0.15);
+            --selected-border: #4ade80;
+            --hover: #1a3d33;
+            --text: #e6f4ef;
+            --text-secondary: #7dbaa8;
+            --text-light: #5a9a88;
+            --toolbar-bg: #142b24;
+            --status-bg: #0d1f1a;
+        }
+
+        body.theme-beige {
+            --bg: #1a1714;
+            --sidebar-bg: #242019;
+            --header-bg: #2d2820;
+            --border: #4a4339;
+            --border-light: #3a342b;
+            --accent: #e8a838;
+            --accent-hover: #f5b840;
+            --selected: rgba(232,168,56,0.15);
+            --selected-border: #e8a838;
+            --hover: #3a342b;
+            --text: #f5f0e8;
+            --text-secondary: #b8a88a;
+            --text-light: #8a7a6a;
+            --toolbar-bg: #242019;
+            --status-bg: #1a1714;
+        }
+
+        /* ===== 字体大小 ===== */
+        html { font-size: 100%; }
+        body.font-small { font-size: 87.5%; }
+        body.font-medium { font-size: 100%; }
+        body.font-large { font-size: 112.5%; }
+        body.font-xlarge { font-size: 125%; }
+
+        /* ===== 卡片密度 ===== */
+        body.density-compact .main-content { padding: 12px; }
+        body.density-compact .items-grid { gap: 8px; }
+        body.density-compact .item-card { padding: 10px; }
+        body.density-compact .details-view td { padding: 4px 10px; }
+        body.density-compact .details-view th { padding: 6px 10px; }
+        body.density-compact .list-item { padding: 4px 12px; margin: 0 6px; }
+        body.density-compact .icon-item { padding: 8px 4px; width: 90px; }
+        body.density-compact .toolbar { padding: 6px 12px; }
+        body.density-compact .status-bar { height: 24px; padding: 0 12px; }
+        body.density-compact .sidebar { width: 240px; padding: 6px 0; }
+        body.density-compact .tree-item { padding: 4px 8px 4px 10px; margin: 1px 6px; }
+
+        body.density-loose .main-content { padding: 24px; }
+        body.density-loose .items-grid { gap: 20px; }
+        body.density-loose .item-card { padding: 20px; }
+        body.density-loose .details-view td { padding: 10px 14px; }
+        body.density-loose .details-view th { padding: 10px 14px; }
+        body.density-loose .list-item { padding: 10px 18px; margin: 2px 10px; }
+        body.density-loose .icon-item { padding: 16px 10px; width: 110px; }
+        body.density-loose .toolbar { padding: 10px 20px; }
+        body.density-loose .status-bar { height: 32px; padding: 0 20px; }
+        body.density-loose .sidebar { width: 280px; padding: 12px 0; }
+        body.density-loose .tree-item { padding: 8px 10px 8px 14px; margin: 2px 10px; }
+
+        /* ===== 侧边栏宽度 ===== */
+        body.sidebar-narrow .sidebar { width: 220px; }
+        body.sidebar-narrow .sidebar-section-title { padding: 6px 12px 2px; font-size: 10px; }
+        body.sidebar-narrow .tree-item { padding: 5px 8px 5px 10px; font-size: 13px; }
+
+        body.sidebar-wide .sidebar { width: 300px; }
+        body.sidebar-wide .sidebar-section-title { padding: 10px 18px 4px; }
+        body.sidebar-wide .tree-item { padding: 8px 12px 8px 16px; font-size: 14px; }
+
+        /* ===== 字体 ===== */
+        body.font-system { font-family: 'Segoe UI', 'Microsoft YaHei', Arial, sans-serif; }
+        body.font-serif { font-family: 'Noto Serif CJK SC', 'Source Han Serif SC', 'SimSun', 'STSong', serif; }
+        body.font-sans { font-family: 'Noto Sans CJK SC', 'Source Han Sans SC', 'SimHei', 'STHeiti', sans-serif; }
+        body.font-mono { font-family: 'JetBrains Mono', 'Consolas', 'Monaco', 'Courier New', monospace; }
+
+        /* ===== 设置按钮 ===== */
+        .settings-btn {
+            padding: 8px 14px;
+            margin: 8px;
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            cursor: pointer;
+            transition: all 0.2s;
+            border: 1px solid var(--border-light);
+            background: white;
+            color: var(--text-secondary);
+            font-size: 13px;
+            flex-shrink: 0;
+        }
+        .settings-btn:hover {
+            background: var(--hover);
+            color: var(--accent);
+            border-color: var(--accent);
+        }
+        body.theme-dark .settings-btn,
+        body.theme-mint .settings-btn,
+        body.theme-beige .settings-btn { background: var(--sidebar-bg); border-color: var(--border); color: var(--text-secondary); }
     </style>
 </head>
 <body>
@@ -438,6 +724,8 @@
         <div class="sidebar" id="sidebar">
             <div class="sidebar-section-title">导航</div>
             <div id="treeRoot"></div>
+            <div style="flex:1;min-height:20px;"></div>
+            <button class="settings-btn" id="settingsBtn" onclick="openPersonalPanel()">⚙️ 个性化设置</button>
         </div>
 
         <!-- Right Main Content -->
@@ -1420,6 +1708,148 @@
             if (type.includes('text') || type.includes('plain')) return '📃';
             return '📄';
         }
+
+        // ==================== Personalization Settings ====================
+        const PERSONAL_CONFIG = {
+            theme: { dark: 'theme-dark', light: 'theme-light', mint: 'theme-mint', beige: 'theme-beige' },
+            font: { small: 'font-small', medium: 'font-medium', large: 'font-large', xlarge: 'font-xlarge' },
+            density: { compact: 'density-compact', comfort: '', loose: 'density-loose' },
+            sidebar: { narrow: 'sidebar-narrow', medium: '', wide: 'sidebar-wide' },
+            fontFamily: { system: 'font-system', serif: 'font-serif', sans: 'font-sans', mono: 'font-mono' }
+        };
+
+        let personalSettings = { theme: 'light', font: 'medium', density: 'comfort', sidebar: 'medium', fontFamily: 'system' };
+        try { Object.assign(personalSettings, JSON.parse(localStorage.getItem('warehouseSettings') || '{}')); } catch (e) {}
+
+        function applyPersonalSettings(s) {
+            s = s || personalSettings;
+            // theme
+            clearPersonalClasses('theme', PERSONAL_CONFIG.theme);
+            const tc = PERSONAL_CONFIG.theme[s.theme || 'light'];
+            if (tc) document.body.classList.add(tc);
+            setPersonalActive('theme', s.theme || 'light');
+            // font
+            clearPersonalClasses('font', PERSONAL_CONFIG.font);
+            const fc = PERSONAL_CONFIG.font[s.font || 'medium'];
+            if (fc) document.body.classList.add(fc);
+            setPersonalActive('font', s.font || 'medium');
+            // density
+            clearPersonalClasses('density', PERSONAL_CONFIG.density);
+            const dc = PERSONAL_CONFIG.density[s.density || 'comfort'];
+            if (dc) document.body.classList.add(dc);
+            setPersonalActive('density', s.density || 'comfort');
+            // sidebar
+            clearPersonalClasses('sidebar', PERSONAL_CONFIG.sidebar);
+            const sc = PERSONAL_CONFIG.sidebar[s.sidebar || 'medium'];
+            if (sc) document.body.classList.add(sc);
+            setPersonalActive('sidebar', s.sidebar || 'medium');
+            // fontFamily
+            clearPersonalClasses('fontFamily', PERSONAL_CONFIG.fontFamily);
+            const ffc = PERSONAL_CONFIG.fontFamily[s.fontFamily || 'system'];
+            if (ffc) document.body.classList.add(ffc);
+            setPersonalActive('fontFamily', s.fontFamily || 'system');
+        }
+
+        function clearPersonalClasses(prefix, map) {
+            Object.values(map).forEach(c => { if (c) document.body.classList.remove(c); });
+        }
+        function setPersonalActive(group, value) {
+            document.querySelectorAll(`#${group}Options .personal-option`).forEach(el => el.classList.remove('active'));
+            const target = document.querySelector(`#${group}Options .personal-option[data-value="${value}"]`);
+            if (target) target.classList.add('active');
+        }
+        function savePersonalSettings(s) {
+            localStorage.setItem('warehouseSettings', JSON.stringify(s));
+        }
+        function bindPersonalOption(group) {
+            document.querySelectorAll(`#${group}Options .personal-option`).forEach(el => {
+                el.addEventListener('click', function() {
+                    const val = this.getAttribute('data-value');
+                    personalSettings[group] = val;
+                    savePersonalSettings(personalSettings);
+                    applyPersonalSettings(personalSettings);
+                });
+            });
+        }
+        function openPersonalPanel() {
+            document.getElementById('personalOverlay').classList.add('show');
+        }
+        function closePersonalPanel() {
+            document.getElementById('personalOverlay').classList.remove('show');
+        }
+        document.getElementById('personalOverlay').addEventListener('click', function(e) {
+            if (e.target === this) closePersonalPanel();
+        });
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') closePersonalPanel();
+        });
+
+        // Initialize
+        applyPersonalSettings(personalSettings);
+        ['theme', 'font', 'density', 'sidebar', 'fontFamily'].forEach(bindPersonalOption);
     </script>
+
+    <!-- Personalization Panel -->
+    <div class="personal-overlay" id="personalOverlay">
+        <div class="personal-panel">
+            <div class="personal-header">
+                <h2>个性化设置</h2>
+                <button class="personal-close" onclick="closePersonalPanel()">&times;</button>
+            </div>
+            <div class="personal-body">
+                <div class="personal-section">
+                    <div class="personal-label">主题</div>
+                    <div class="personal-options" id="themeOptions">
+                        <div class="personal-option" data-value="dark">
+                            <span class="preview-dot" style="background:#0f1115"></span>深色
+                        </div>
+                        <div class="personal-option" data-value="light">
+                            <span class="preview-dot" style="background:#f6f8fa"></span>浅色
+                        </div>
+                        <div class="personal-option" data-value="mint">
+                            <span class="preview-dot" style="background:#0d1f1a"></span>薄荷绿
+                        </div>
+                        <div class="personal-option" data-value="beige">
+                            <span class="preview-dot" style="background:#1a1714"></span>米色
+                        </div>
+                    </div>
+                </div>
+                <div class="personal-section">
+                    <div class="personal-label">字体大小</div>
+                    <div class="personal-options" id="fontOptions">
+                        <div class="personal-option" data-value="small">小</div>
+                        <div class="personal-option" data-value="medium">中</div>
+                        <div class="personal-option" data-value="large">大</div>
+                        <div class="personal-option" data-value="xlarge">超大</div>
+                    </div>
+                </div>
+                <div class="personal-section">
+                    <div class="personal-label">卡片密度</div>
+                    <div class="personal-options" id="densityOptions">
+                        <div class="personal-option" data-value="compact">紧凑</div>
+                        <div class="personal-option" data-value="comfort">舒适</div>
+                        <div class="personal-option" data-value="loose">宽松</div>
+                    </div>
+                </div>
+                <div class="personal-section">
+                    <div class="personal-label">侧边栏宽度</div>
+                    <div class="personal-options" id="sidebarOptions">
+                        <div class="personal-option" data-value="narrow">窄</div>
+                        <div class="personal-option" data-value="medium">中</div>
+                        <div class="personal-option" data-value="wide">宽</div>
+                    </div>
+                </div>
+                <div class="personal-section">
+                    <div class="personal-label">字体</div>
+                    <div class="personal-options" id="fontFamilyOptions">
+                        <div class="personal-option" data-value="system">系统默认</div>
+                        <div class="personal-option" data-value="serif">宋体</div>
+                        <div class="personal-option" data-value="sans">黑体</div>
+                        <div class="personal-option" data-value="mono">等宽</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
 </body>
 </html>
