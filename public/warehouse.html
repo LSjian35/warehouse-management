@@ -1122,6 +1122,10 @@
             loadProjects();
             setupEventListeners();
             setView('details');
+            // 延迟绑定 personal panel 的事件（HTML 在 script 之后）
+            ['theme', 'font', 'density', 'sidebar', 'fontFamily'].forEach(bindPersonalOption);
+            applyPersonalSettings(personalSettings);
+            bindOverlayEvent();
         });
 
         function setupEventListeners() {
@@ -2090,10 +2094,6 @@
             document.getElementById('settingsPopup').classList.remove('show');
             document.getElementById('settingsBtn').classList.remove('active');
         }
-        // Initialize
-        applyPersonalSettings(personalSettings);
-        ['theme', 'font', 'density', 'sidebar', 'fontFamily'].forEach(bindPersonalOption);
-
         // settingsBtn 在 script 之前，可以直接绑定
         document.getElementById('settingsBtn').addEventListener('click', toggleSettingsPopup);
         document.addEventListener('click', function(e) {
