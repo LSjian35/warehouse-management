@@ -324,7 +324,7 @@ app.post('/api/files', upload.single('file'), async (req, res) => {
 app.get('/local-files/:filename', (req, res) => {
     const filePath = path.join(STORAGE_ROOT, 'files', decodeURIComponent(req.params.filename));
     if (fs.existsSync(filePath)) {
-        res.download(filePath);
+        res.sendFile(filePath);
     } else {
         res.status(404).json({ error: '文件不存在' });
     }
