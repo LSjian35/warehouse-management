@@ -330,6 +330,15 @@ app.get('/local-files/:filename', (req, res) => {
     }
 });
 
+// 获取单个文件信息
+app.get('/api/files/:id', (req, res) => {
+    const data = initData();
+    const fileId = parseInt(req.params.id);
+    const file = data.files.find(f => f.id === fileId);
+    if (!file) return res.status(404).json({ error: '文件不存在' });
+    res.json(file);
+});
+
 // 下载文件 -> GitHub 重定向 或 本地文件下载
 app.get('/api/files/:id/download', (req, res) => {
     const data = initData();
