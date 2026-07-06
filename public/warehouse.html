@@ -115,13 +115,27 @@
             width: 260px;
             background: var(--sidebar-bg);
             border-right: 1px solid var(--border);
-            overflow-y: auto;
-            overflow-x: hidden;
-            padding: 8px 0;
+            overflow: hidden;
+            padding: 8px 0 0;
             flex-shrink: 0;
             user-select: none;
             backdrop-filter: blur(10px);
             -webkit-backdrop-filter: blur(10px);
+            display: flex;
+            flex-direction: column;
+            position: relative;
+        }
+        .sidebar-nav {
+            flex: 1;
+            overflow-y: auto;
+            overflow-x: hidden;
+        }
+        .sidebar-nav::-webkit-scrollbar { width: 4px; }
+        .sidebar-nav::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 2px; }
+        .sidebar-bottom {
+            flex-shrink: 0;
+            padding: 0 0 12px;
+            position: relative;
         }
         .sidebar-section-title {
             padding: 8px 16px 4px;
@@ -745,6 +759,58 @@
             --status-bg: #1a1714;
         }
 
+        body.theme-starry {
+            --bg: #0b0b1a;
+            --sidebar-bg: #10102a;
+            --header-bg: linear-gradient(135deg, #1a1040 0%, #0e0e28 100%);
+            --border: rgba(139, 92, 246, 0.15);
+            --border-light: rgba(139, 92, 246, 0.08);
+            --accent: #a78bfa;
+            --accent-hover: #c4b5fd;
+            --selected: rgba(167, 139, 250, 0.15);
+            --selected-border: rgba(167, 139, 250, 0.4);
+            --hover: rgba(139, 92, 246, 0.08);
+            --text: #e8e0ff;
+            --text-secondary: #a094c8;
+            --text-light: #7c6faa;
+            --toolbar-bg: #10102a;
+            --status-bg: #0b0b1a;
+        }
+        body.theme-starry .sidebar { background: var(--sidebar-bg); border-right-color: var(--border); }
+        body.theme-starry .main-content { background: var(--bg); }
+        body.theme-starry .toolbar { background: var(--toolbar-bg); border-bottom-color: var(--border); }
+        body.theme-starry .status-bar { background: var(--status-bg); border-top-color: var(--border); }
+        body.theme-starry .address-bar { background: rgba(16, 16, 42, 0.8); border-color: var(--border); }
+        body.theme-starry .details-view thead { background: #10102a; }
+        body.theme-starry .details-view th { border-bottom-color: var(--border); color: var(--text-secondary); }
+        body.theme-starry .details-view td { border-bottom-color: var(--border-light); }
+        body.theme-starry .details-view tbody tr:hover { background: var(--hover); }
+        body.theme-starry .context-menu { background: rgba(16, 16, 42, 0.95); border-color: var(--border); }
+        body.theme-starry .context-menu-item:hover { background: var(--hover); }
+        body.theme-starry .modal { background: rgba(16, 16, 42, 0.95); }
+        body.theme-starry .modal-header { color: var(--text); }
+        body.theme-starry .modal-body input { background: #0b0b1a; border-color: var(--border); color: var(--text); }
+        body.theme-starry .search-box { background: #0b0b1a; border-color: var(--border); color: var(--text); }
+        body.theme-starry .view-toggle { border-color: var(--border); }
+        body.theme-starry .view-btn { background: var(--sidebar-bg); color: var(--text-secondary); }
+        body.theme-starry .view-btn.active { background: var(--selected); color: var(--accent); }
+        body.theme-starry .nav-btn:hover:not(:disabled) { background: var(--hover); }
+        body.theme-starry .toolbar-btn { background: var(--sidebar-bg); border-color: var(--border); color: var(--text); }
+        body.theme-starry .toolbar-btn:hover { background: var(--hover); }
+        body.theme-starry .tree-item:hover { background: var(--hover); }
+        body.theme-starry .tree-item.active { background: var(--selected); border-color: var(--accent); }
+        body.theme-starry .personal-panel { background: rgba(16, 16, 42, 0.95); border-color: var(--border); }
+        body.theme-starry .personal-header { border-bottom-color: var(--border); }
+        body.theme-starry .personal-header h2 { color: var(--text); }
+        body.theme-starry .personal-option { background: var(--bg); border-color: var(--border); color: var(--text-secondary); }
+        body.theme-starry .personal-option:hover { border-color: var(--accent); color: var(--text); }
+        body.theme-starry .personal-option.active { background: var(--selected); border-color: var(--accent); color: var(--accent); }
+        body.theme-starry .settings-btn { background: var(--bg); border-color: var(--border); color: var(--text-secondary); }
+        body.theme-starry .settings-popup { background: rgba(16, 16, 42, 0.95); border-color: var(--border); box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4); }
+        body.theme-starry .settings-popup-arrow { background: rgba(16, 16, 42, 0.95); border-color: var(--border); }
+        body.theme-starry .settings-popup-item { color: var(--text); }
+        body.theme-starry .settings-popup-item:hover { background: var(--hover); color: var(--accent); }
+
         /* ===== 字体大小 ===== */
         html { font-size: 100%; }
         body.font-small { font-size: 87.5%; }
@@ -794,41 +860,133 @@
 
         /* ===== 设置按钮 ===== */
         .settings-btn {
-            padding: 6px 8px;
-            margin: 8px 8px 12px;
+            margin: 4px 12px 0;
             border-radius: 8px;
             display: flex;
             align-items: center;
             justify-content: center;
             cursor: pointer;
-            transition: all 0.2s;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
             border: 1px solid var(--border);
-            background: var(--sidebar-bg);
+            background: var(--bg);
             color: var(--text-secondary);
             flex-shrink: 0;
-            width: 32px;
-            height: 32px;
+            width: 36px;
+            height: 36px;
         }
         .settings-btn:hover {
             background: var(--hover);
             color: var(--accent);
             border-color: var(--accent);
+            box-shadow: 0 0 12px rgba(99, 102, 241, 0.15);
         }
         .settings-btn.active {
             border-color: var(--accent);
             color: var(--accent);
-        }
-        .settings-btn.active svg {
-            transform: rotate(-90deg);
+            background: rgba(99, 102, 241, 0.1);
         }
         .settings-btn svg {
             width: 16px;
             height: 16px;
-            transition: transform 0.2s ease;
+            transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
         }
+        .settings-btn.active svg {
+            transform: rotate(-90deg);
+        }
+
+        /* ===== 设置弹出菜单 ===== */
+        .settings-popup {
+            position: absolute;
+            bottom: 52px;
+            left: 12px;
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid rgba(0, 0, 0, 0.08);
+            border-radius: 10px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+            padding: 4px;
+            z-index: 100;
+            display: none;
+            animation: settingsPopIn 0.2s ease-out;
+        }
+        .settings-popup.show {
+            display: block;
+        }
+        @keyframes settingsPopIn {
+            from { opacity: 0; transform: translateY(8px) scale(0.95); }
+            to { opacity: 1; transform: translateY(0) scale(1); }
+        }
+        .settings-popup-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px 14px;
+            border-radius: 7px;
+            cursor: pointer;
+            font-size: 13px;
+            color: #1a1a2e;
+            transition: all 0.15s;
+            white-space: nowrap;
+            border: none;
+            background: none;
+            width: 100%;
+            text-align: left;
+        }
+        .settings-popup-item:hover {
+            background: rgba(99, 102, 241, 0.08);
+            color: #6366f1;
+        }
+        .settings-popup-item .popup-icon {
+            font-size: 16px;
+            width: 20px;
+            text-align: center;
+            flex-shrink: 0;
+        }
+        .settings-popup-item .popup-label {
+            font-weight: 500;
+        }
+        .settings-popup-arrow {
+            position: absolute;
+            bottom: -6px;
+            left: 24px;
+            width: 12px;
+            height: 12px;
+            background: rgba(255, 255, 255, 0.95);
+            border: 1px solid rgba(0, 0, 0, 0.08);
+            border-top: none;
+            border-left: none;
+            transform: rotate(45deg);
+            border-radius: 0 0 3px 0;
+        }
+
         body.theme-dark .settings-btn,
         body.theme-mint .settings-btn,
-        body.theme-beige .settings-btn { background: var(--sidebar-bg); border-color: var(--border); color: var(--text-secondary); }
+        body.theme-beige .settings-btn { background: var(--bg); border-color: var(--border); color: var(--text-secondary); }
+        body.theme-dark .settings-popup,
+        body.theme-mint .settings-popup,
+        body.theme-beige .settings-popup {
+            background: rgba(22, 27, 34, 0.95);
+            border-color: var(--border);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+        }
+        body.theme-dark .settings-popup-arrow,
+        body.theme-mint .settings-popup-arrow,
+        body.theme-beige .settings-popup-arrow {
+            background: rgba(22, 27, 34, 0.95);
+            border-color: var(--border);
+        }
+        body.theme-dark .settings-popup-item,
+        body.theme-mint .settings-popup-item,
+        body.theme-beige .settings-popup-item {
+            color: var(--text);
+        }
+        body.theme-dark .settings-popup-item:hover,
+        body.theme-mint .settings-popup-item:hover,
+        body.theme-beige .settings-popup-item:hover {
+            background: var(--hover);
+            color: var(--accent);
+        }
     </style>
 </head>
 <body>
@@ -843,16 +1001,26 @@
     <div class="container">
         <!-- Left Sidebar: Tree Navigation -->
         <div class="sidebar" id="sidebar">
-            <div class="sidebar-section-title">导航</div>
-            <div id="treeRoot"></div>
-            <div style="flex:1;min-height:20px;"></div>
-            <button class="settings-btn" id="settingsBtn" title="个性化设置" onclick="openPersonalPanel()">
-                <svg viewBox="0 0 24 24" width="16" height="16">
-                    <circle cx="5" cy="12" r="2" fill="currentColor"/>
-                    <circle cx="12" cy="12" r="2" fill="currentColor"/>
-                    <circle cx="19" cy="12" r="2" fill="currentColor"/>
-                </svg>
-            </button>
+            <div class="sidebar-nav">
+                <div class="sidebar-section-title">导航</div>
+                <div id="treeRoot"></div>
+            </div>
+            <div class="sidebar-bottom">
+                <button class="settings-btn" id="settingsBtn" title="设置">
+                    <svg viewBox="0 0 24 24" width="16" height="16">
+                        <circle cx="5" cy="12" r="2" fill="currentColor"/>
+                        <circle cx="12" cy="12" r="2" fill="currentColor"/>
+                        <circle cx="19" cy="12" r="2" fill="currentColor"/>
+                    </svg>
+                </button>
+                <div class="settings-popup" id="settingsPopup">
+                    <div class="settings-popup-arrow"></div>
+                    <div class="settings-popup-item" onclick="openPersonalPanel(); closeSettingsPopup();">
+                        <span class="popup-icon">🎨</span>
+                        <span class="popup-label">个性化设置</span>
+                    </div>
+                </div>
+            </div>
         </div>
 
         <!-- Right Main Content -->
@@ -1838,7 +2006,7 @@
 
         // ==================== Personalization Settings ====================
         const PERSONAL_CONFIG = {
-            theme: { dark: 'theme-dark', light: 'theme-light', mint: 'theme-mint', beige: 'theme-beige' },
+            theme: { dark: 'theme-dark', light: 'theme-light', mint: 'theme-mint', beige: 'theme-beige', starry: 'theme-starry' },
             font: { small: 'font-small', medium: 'font-medium', large: 'font-large', xlarge: 'font-xlarge' },
             density: { compact: 'density-compact', comfort: '', loose: 'density-loose' },
             sidebar: { narrow: 'sidebar-narrow', medium: '', wide: 'sidebar-wide' },
@@ -1904,16 +2072,47 @@
         function closePersonalPanel() {
             document.getElementById('personalOverlay').classList.remove('show');
         }
-        document.getElementById('personalOverlay').addEventListener('click', function(e) {
-            if (e.target === this) closePersonalPanel();
-        });
-        document.addEventListener('keydown', function(e) {
-            if (e.key === 'Escape') closePersonalPanel();
-        });
 
+        // ===== 设置弹出菜单 =====
+        function toggleSettingsPopup(e) {
+            e.stopPropagation();
+            const btn = document.getElementById('settingsBtn');
+            const popup = document.getElementById('settingsPopup');
+            const isOpen = popup.classList.contains('show');
+            if (isOpen) {
+                closeSettingsPopup();
+            } else {
+                popup.classList.add('show');
+                btn.classList.add('active');
+            }
+        }
+        function closeSettingsPopup() {
+            document.getElementById('settingsPopup').classList.remove('show');
+            document.getElementById('settingsBtn').classList.remove('active');
+        }
         // Initialize
         applyPersonalSettings(personalSettings);
         ['theme', 'font', 'density', 'sidebar', 'fontFamily'].forEach(bindPersonalOption);
+
+        // settingsBtn 在 script 之前，可以直接绑定
+        document.getElementById('settingsBtn').addEventListener('click', toggleSettingsPopup);
+        document.addEventListener('click', function(e) {
+            if (!e.target.closest('.sidebar-bottom')) {
+                closeSettingsPopup();
+            }
+        });
+        // personalOverlay 在 script 之后，延迟绑定
+        function bindOverlayEvent() {
+            document.getElementById('personalOverlay').addEventListener('click', function(e) {
+                if (e.target === this) closePersonalPanel();
+            });
+        }
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', bindOverlayEvent);
+        } else {
+            // script 在 body 中间执行时 DOM 未完全解析，用 requestAnimationFrame 延迟
+            requestAnimationFrame(bindOverlayEvent);
+        }
     </script>
 
     <!-- Personalization Panel -->
@@ -1938,6 +2137,9 @@
                         </div>
                         <div class="personal-option" data-value="beige">
                             <span class="preview-dot" style="background:#1a1714"></span>米色
+                        </div>
+                        <div class="personal-option" data-value="starry">
+                            <span class="preview-dot" style="background:linear-gradient(135deg,#6366f1,#a78bfa)"></span>星空紫
                         </div>
                     </div>
                 </div>
