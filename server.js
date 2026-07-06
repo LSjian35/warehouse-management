@@ -276,20 +276,24 @@ app.post('/api/files', upload.single('file'), async (req, res) => {
         return res.status(400).json({ error: '没有上传文件' });
     }
     
-    if (!GITHUB_TOKEN) {
-        return res.status(500).json({ error: 'GITHUB_TOKEN 未配置，请在 Railway 环境变量中设置' });
-    }
-    
     try {
-        const fileContent = fs.readFileSync(file.path);
-        const base64Content = fileContent.toString('base64');
+        let downloadUrl = null;
         
-        const downloadUrl = await uploadToGitHub(file.originalname, base64Content);
-        
-        // 删除临时文件
-        try {
-            fs.unlinkSync(file.path);
-        } catch(e) {}
+        if (GITHUB_TOKEN) {
+            // 有 Token 时推送到 GitHub
+            const fileContent = fs.readFileSync(file.path);
+            const base64Content = fileContent.toString('base64');
+            downloadUrl = await uploadToGitHub(file.originalname, base64Content);
+            // 删除临时文件
+            try { fs.unlinkSync(file.path); } catch(e) {}
+        } else {
+            // 没有 Token 时保存到本地 storage 目录
+            const localDir = path.join(STORAGE_ROOT, 'files');
+            if (!fs.existsSync(localDir)) fs.mkdirSync(localDir, { recursive: true });
+            const localPath = path.join(localDir, file.originalname);
+            fs.renameSync(file.path, localPath);
+            downloadUrl = `/local-files/${encodeURIComponent(file.originalname)}`;
+        }
         
         const data = initData();
         const { parent_id, parent_type } = req.body;
@@ -309,16 +313,24 @@ app.post('/api/files', upload.single('file'), async (req, res) => {
         saveData(data);
         res.json(fileRecord);
     } catch (err) {
-        console.error('GitHub 上传错误:', err);
+        console.error('文件上传错误:', err);
         // 删除临时文件
-        try {
-            fs.unlinkSync(file.path);
-        } catch(e) {}
-        res.status(500).json({ error: '上传到 GitHub 失败', details: err.message });
+        try { fs.unlinkSync(file.path); } catch(e) {}
+        res.status(500).json({ error: '文件上传失败', details: err.message });
     }
 });
 
-// 下载文件 -> 重定向到 GitHub raw 链接
+// 本地文件下载
+app.get('/local-files/:filename', (req, res) => {
+    const filePath = path.join(STORAGE_ROOT, 'files', decodeURIComponent(req.params.filename));
+    if (fs.existsSync(filePath)) {
+        res.download(filePath);
+    } else {
+        res.status(404).json({ error: '文件不存在' });
+    }
+});
+
+// 下载文件 -> GitHub 重定向 或 本地文件下载
 app.get('/api/files/:id/download', (req, res) => {
     const data = initData();
     const fileId = parseInt(req.params.id);
@@ -328,7 +340,16 @@ app.get('/api/files/:id/download', (req, res) => {
         return res.status(404).json({ error: '文件不存在' });
     }
     
-    if (file.url) {
+    if (file.url && file.url.startsWith('/local-files/')) {
+        // 本地文件
+        const filePath = path.join(STORAGE_ROOT, 'files', decodeURIComponent(file.name));
+        if (fs.existsSync(filePath)) {
+            res.download(filePath, file.name);
+        } else {
+            res.status(404).json({ error: '本地文件不存在' });
+        }
+    } else if (file.url) {
+        // GitHub 文件，重定向
         res.redirect(file.url);
     } else {
         res.status(404).json({ error: '文件链接不可用' });
