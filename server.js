@@ -406,11 +406,11 @@ audio{width:100%;max-width:600px}
 </style></head><body>
 <div class="header"><h1>${file.name}</h1><a href="/api/files/${file.id}/download" download>下载文件</a></div>
 <audio controls autoplay src="${audSrc}"></audio></body></html>`);
-    } else if (ext === 'pdf') {
-        const pdfSrc = `/local-files/${encodeURIComponent(file.name)}`;
+    } else if (ext === 'pdf' || ext === 'html' || ext === 'htm') {
+        const src = `/local-files/${encodeURIComponent(file.name)}`;
         res.send(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>${file.name}</title>
 <style>*{margin:0;padding:0}body{background:#f8f7f4}</style></head><body>
-<iframe src="${pdfSrc}" style="width:100%;height:100vh;border:none"></iframe></body></html>`);
+<iframe src="${src}" style="width:100%;height:100vh;border:none"></iframe></body></html>`);
     } else {
         // 文本/代码/其他 -> 纯文本预览
         fs.readFile(filePath, 'utf-8', (err, content) => {
