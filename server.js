@@ -341,6 +341,7 @@ app.get('/api/files/:id', (req, res) => {
 
 // 预览文件 -> 根据类型返回 HTML 页面
 app.get('/api/files/:id/preview', (req, res) => {
+    try {
     const data = initData();
     const fileId = parseInt(req.params.id);
     const file = data.files.find(f => f.id === fileId);
@@ -431,6 +432,10 @@ pre{white-space:pre-wrap;word-break:break-all;line-height:1.7;font-size:14px;tab
 <pre><code>${escaped}</code></pre>
 </body></html>`);
         });
+    }
+    } catch (err) {
+        console.error('预览错误:', err);
+        res.status(500).send('预览失败: ' + err.message);
     }
 });
 
