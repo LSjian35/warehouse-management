@@ -882,144 +882,6 @@
         body.font-sans { font-family: 'Noto Sans CJK SC', 'Source Han Sans SC', 'SimHei', 'STHeiti', sans-serif; }
         body.font-mono { font-family: 'JetBrains Mono', 'Consolas', 'Monaco', 'Courier New', monospace; }
 
-        /* ===== 文件预览弹窗 ===== */
-        .preview-overlay {
-            position: fixed;
-            top: 0; left: 0; right: 0; bottom: 0;
-            background: var(--overlay-bg);
-            z-index: 2000;
-            display: none;
-            align-items: center;
-            justify-content: center;
-            animation: fadeIn 0.2s ease;
-        }
-        .preview-overlay.show { display: flex; }
-        .preview-panel {
-            background: var(--panel-bg);
-            backdrop-filter: blur(16px);
-            -webkit-backdrop-filter: blur(16px);
-            border: 1px solid var(--border);
-            border-radius: 12px;
-            width: 90vw;
-            max-width: 900px;
-            max-height: 85vh;
-            display: flex;
-            flex-direction: column;
-            box-shadow: 0 16px 64px rgba(0,0,0,0.3);
-            animation: previewSlideIn 0.25s ease-out;
-        }
-        @keyframes previewSlideIn {
-            from { opacity: 0; transform: translateY(20px) scale(0.97); }
-            to { opacity: 1; transform: translateY(0) scale(1); }
-        }
-        .preview-header {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            padding: 14px 20px;
-            border-bottom: 1px solid var(--border);
-            flex-shrink: 0;
-        }
-        .preview-header h3 {
-            font-size: 15px;
-            font-weight: 600;
-            color: var(--text);
-            margin: 0;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            max-width: 60%;
-        }
-        .preview-header-actions {
-            display: flex;
-            gap: 8px;
-            align-items: center;
-            flex-shrink: 0;
-        }
-        .preview-info {
-            font-size: 11px;
-            color: var(--text-light);
-            margin-right: 8px;
-            white-space: nowrap;
-        }
-        .preview-close-btn {
-            width: 32px;
-            height: 32px;
-            border-radius: 8px;
-            border: 1px solid var(--border);
-            background: var(--bg);
-            color: var(--text-secondary);
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 18px;
-            transition: all 0.15s;
-            flex-shrink: 0;
-        }
-        .preview-close-btn:hover {
-            background: var(--hover);
-            color: var(--text);
-            border-color: var(--accent);
-        }
-        .preview-download-btn {
-            padding: 5px 12px;
-            border-radius: 6px;
-            border: 1px solid var(--accent);
-            background: var(--selected);
-            color: var(--accent);
-            cursor: pointer;
-            font-size: 12px;
-            transition: all 0.15s;
-            white-space: nowrap;
-        }
-        .preview-download-btn:hover {
-            background: var(--accent);
-            color: #fff;
-        }
-        .preview-body {
-            flex: 1;
-            overflow: auto;
-            padding: 16px;
-        }
-        .preview-media {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            min-height: 200px;
-        }
-        .preview-media img {
-            max-width: 100%;
-            max-height: 65vh;
-            border-radius: 8px;
-            object-fit: contain;
-        }
-        .preview-media video {
-            max-width: 100%;
-            max-height: 65vh;
-            border-radius: 8px;
-        }
-        .preview-code {
-            background: var(--input-bg);
-            border: 1px solid var(--border);
-            border-radius: 8px;
-            padding: 16px;
-            font-family: 'Cascadia Code', 'Fira Code', 'Consolas', monospace;
-            font-size: 13px;
-            line-height: 1.6;
-            color: var(--text);
-            white-space: pre-wrap;
-            word-break: break-all;
-            overflow-x: auto;
-            margin: 0;
-        }
-        .preview-error, .preview-unknown {
-            text-align: center;
-            padding: 60px 20px;
-            color: var(--text-light);
-            font-size: 14px;
-        }
-
         /* ===== 设置按钮 ===== */
         .settings-btn {
             margin: 4px 12px 0;
@@ -1288,18 +1150,7 @@
             ['theme', 'font', 'density', 'sidebar', 'fontFamily'].forEach(bindPersonalOption);
             applyPersonalSettings(personalSettings);
             bindOverlayEvent();
-            // 预览弹窗事件
-            document.getElementById('previewOverlay').addEventListener('click', function(e) {
-                if (e.target === this) closePreview();
-            });
-            document.getElementById('previewDownloadBtn').addEventListener('click', function() {
-                const id = this.dataset.fileId;
-                if (id) downloadFile(parseInt(id));
-            });
-            document.addEventListener('keydown', function(e) {
-                if (e.key === 'Escape') closePreview();
-            });
-        });
+          });
 
         function setupEventListeners() {
             const adminBtn = document.getElementById('adminBtn');
@@ -1874,55 +1725,26 @@
 
         // ==================== File Preview ====================
         function previewFile(id) {
-            // 优先从内存中查找，否则从 API 获取
             let file = currentItems.find(f => f.id === id);
             if (!file) {
                 fetch(API_BASE + '/api/files/' + id).then(r => r.json()).then(data => {
                     if (data.error) return;
-                    showPreview(data);
+                    openFilePreview(data);
                 });
                 return;
             }
-            showPreview(file);
+            openFilePreview(file);
         }
-        function showPreview(file) {
-            const overlay = document.getElementById('previewOverlay');
-            const title = document.getElementById('previewTitle');
-            const body = document.getElementById('previewBody');
-            const info = document.getElementById('previewInfo');
-            title.textContent = file.name;
-            info.textContent = (file.size ? formatSize(file.size) : '-') + ' · ' + (file.type || '未知类型') + ' · ' + new Date(file.created_at).toLocaleString();
-            // 判断文件类型
+        function openFilePreview(file) {
             const ext = file.name.split('.').pop().toLowerCase();
-            const imageExts = ['jpg','jpeg','png','gif','bmp','webp','svg','ico'];
-            const videoExts = ['mp4','webm','ogg'];
-            const audioExts = ['mp3','wav','ogg'];
-            const codeExts = ['js','ts','py','java','c','cpp','h','css','html','json','xml','yaml','yml','md','sh','sql','go','rs','rb','php','txt','log','cfg','ini','env','gitignore'];
-            if (imageExts.includes(ext)) {
-                body.innerHTML = '<div class="preview-media"><img src="' + escapeHtml(file.url) + '" onerror="this.outerHTML=\'<div class=preview-error>图片加载失败</div>\'" /></div>';
-            } else if (videoExts.includes(ext)) {
-                body.innerHTML = '<div class="preview-media"><video controls src="' + escapeHtml(file.url) + '"></video></div>';
-            } else if (audioExts.includes(ext)) {
-                body.innerHTML = '<div class="preview-media"><audio controls src="' + escapeHtml(file.url) + '" style="width:100%"></audio></div>';
-            } else if (codeExts.includes(ext) || ext === 'pdf') {
-                if (ext === 'pdf') {
-                    body.innerHTML = '<iframe src="' + escapeHtml(file.url) + '" style="width:100%;height:70vh;border:none;border-radius:8px;background:#fff"></iframe>';
-                } else {
-                    fetch(file.url).then(r => r.text()).then(text => {
-                        body.innerHTML = '<pre class="preview-code"><code>' + escapeHtml(text) + '</code></pre>';
-                    }).catch(() => {
-                        body.innerHTML = '<div class="preview-error">文件内容读取失败</div>';
-                    });
-                }
+            const textExts = ['c','cpp','h','hpp','java','py','js','ts','css','json','xml','yaml','yml','md','sh','sql','go','rs','rb','php','txt','log','cfg','ini','env','gitignore','toml','properties'];
+            if (textExts.includes(ext)) {
+                // 代码/文本 -> 新标签页用预览接口显示纯文本
+                window.open(API_BASE + '/api/files/' + file.id + '/preview', '_blank');
             } else {
-                body.innerHTML = '<div class="preview-unknown">该文件类型暂不支持预览</div>';
+                // 图片/HTML/视频/音频/PDF等 -> 直接打开文件 URL
+                window.open(file.url, '_blank');
             }
-            overlay.classList.add('show');
-            document.getElementById('previewDownloadBtn').dataset.fileId = id;
-        }
-        function closePreview() {
-            document.getElementById('previewOverlay').classList.remove('show');
-            document.getElementById('previewBody').innerHTML = '';
         }
 
         function setSort(field) {
@@ -2404,21 +2226,6 @@
                     </div>
                 </div>
             </div>
-        </div>
-    </div>
-
-    <!-- 文件预览弹窗 -->
-    <div class="preview-overlay" id="previewOverlay">
-        <div class="preview-panel">
-            <div class="preview-header">
-                <h3 id="previewTitle">文件名</h3>
-                <div class="preview-header-actions">
-                    <span class="preview-info" id="previewInfo"></span>
-                    <button class="preview-download-btn" id="previewDownloadBtn">⬇ 下载</button>
-                    <button class="preview-close-btn" onclick="closePreview()">×</button>
-                </div>
-            </div>
-            <div class="preview-body" id="previewBody"></div>
         </div>
     </div>
 </body>
