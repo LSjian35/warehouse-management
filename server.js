@@ -339,7 +339,7 @@ app.get('/api/files/:id', (req, res) => {
     res.json(file);
 });
 
-// 预览文件（代码/文本） -> 返回格式化 HTML 页面
+// 预览文件 -> 根据类型返回 HTML 页面
 app.get('/api/files/:id/preview', (req, res) => {
     const data = initData();
     const fileId = parseInt(req.params.id);
@@ -349,17 +349,74 @@ app.get('/api/files/:id/preview', (req, res) => {
     let filePath;
     if (file.url && file.url.startsWith('/local-files/')) {
         filePath = path.join(STORAGE_ROOT, 'files', file.name);
+    } else if (file.url) {
+        // GitHub 文件，直接重定向
+        return res.redirect(file.url);
     } else {
-        return res.status(404).send('仅支持本地文件预览');
+        return res.status(404).send('文件链接不可用');
     }
 
     if (!fs.existsSync(filePath)) return res.status(404).send('文件不存在');
 
     const ext = file.name.split('.').pop().toLowerCase();
-    fs.readFile(filePath, 'utf-8', (err, content) => {
-        if (err) return res.status(500).send('读取失败');
-        const escaped = content.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-        res.send(`<!DOCTYPE html>
+    const imageExts = ['jpg','jpeg','png','gif','bmp','webp','svg','ico'];
+    const videoExts = ['mp4','webm','ogg','mov','avi'];
+    const audioExts = ['mp3','wav','ogg','flac','aac'];
+
+    if (imageExts.includes(ext)) {
+        // 图片 -> 内嵌显示
+        const imgSrc = `/local-files/${encodeURIComponent(file.name)}`;
+        res.send(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>${file.name}</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#f8f7f4;display:flex;flex-direction:column;align-items:center;min-height:100vh;padding:20px}
+.header{width:100%;max-width:900px;display:flex;justify-content:space-between;align-items:center;padding:12px 0;border-bottom:1px solid #d8d5ce;margin-bottom:20px}
+.header h1{font-size:16px;color:#4c1d95;font-weight:600}
+.header a{color:#7a7a7a;text-decoration:none;font-size:13px}
+.header a:hover{color:#4c1d95}
+img{max-width:100%;max-height:80vh;border-radius:8px;box-shadow:0 4px 24px rgba(0,0,0,0.1)}
+</style></head><body>
+<div class="header"><h1>${file.name}</h1><a href="/api/files/${file.id}/download" download>下载文件</a></div>
+<img src="${imgSrc}" /></body></html>`);
+    } else if (videoExts.includes(ext)) {
+        const vidSrc = `/local-files/${encodeURIComponent(file.name)}`;
+        res.send(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>${file.name}</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#f8f7f4;display:flex;flex-direction:column;align-items:center;min-height:100vh;padding:20px}
+.header{width:100%;max-width:900px;display:flex;justify-content:space-between;align-items:center;padding:12px 0;border-bottom:1px solid #d8d5ce;margin-bottom:20px}
+.header h1{font-size:16px;color:#4c1d95;font-weight:600}
+.header a{color:#7a7a7a;text-decoration:none;font-size:13px}
+.header a:hover{color:#4c1d95}
+video{max-width:100%;max-height:80vh;border-radius:8px}
+</style></head><body>
+<div class="header"><h1>${file.name}</h1><a href="/api/files/${file.id}/download" download>下载文件</a></div>
+<video controls autoplay src="${vidSrc}"></video></body></html>`);
+    } else if (audioExts.includes(ext)) {
+        const audSrc = `/local-files/${encodeURIComponent(file.name)}`;
+        res.send(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>${file.name}</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#f8f7f4;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;padding:20px}
+.header{width:100%;max-width:900px;display:flex;justify-content:space-between;align-items:center;padding:12px 0;border-bottom:1px solid #d8d5ce;margin-bottom:40px}
+.header h1{font-size:16px;color:#4c1d95;font-weight:600}
+.header a{color:#7a7a7a;text-decoration:none;font-size:13px}
+.header a:hover{color:#4c1d95}
+audio{width:100%;max-width:600px}
+</style></head><body>
+<div class="header"><h1>${file.name}</h1><a href="/api/files/${file.id}/download" download>下载文件</a></div>
+<audio controls autoplay src="${audSrc}"></audio></body></html>`);
+    } else if (ext === 'pdf') {
+        const pdfSrc = `/local-files/${encodeURIComponent(file.name)}`;
+        res.send(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>${file.name}</title>
+<style>*{margin:0;padding:0}body{background:#f8f7f4}</style></head><body>
+<iframe src="${pdfSrc}" style="width:100%;height:100vh;border:none"></iframe></body></html>`);
+    } else {
+        // 文本/代码/其他 -> 纯文本预览
+        fs.readFile(filePath, 'utf-8', (err, content) => {
+            if (err) return res.status(500).send('读取失败');
+            const escaped = content.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+            res.send(`<!DOCTYPE html>
 <html><head><meta charset="utf-8"><title>${file.name}</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
@@ -369,13 +426,12 @@ body{background:#f8f7f4;color:#2c2c2c;font-family:'Cascadia Code','Fira Code','C
 .header a{color:#7a7a7a;text-decoration:none;font-size:13px}
 .header a:hover{color:#4c1d95}
 pre{white-space:pre-wrap;word-break:break-all;line-height:1.7;font-size:14px;tab-size:4}
-.line-numbers{color:#b0aaa0;user-select:none;margin-right:16px;float:left;text-align:right;width:40px}
-.code-content{margin-left:56px}
 </style></head><body>
 <div class="header"><h1>${file.name}</h1><a href="/api/files/${file.id}/download" download>下载文件</a></div>
-<pre><code class="code-content">${escaped}</code></pre>
+<pre><code>${escaped}</code></pre>
 </body></html>`);
-    });
+        });
+    }
 });
 
 // 下载文件 -> GitHub 重定向 或 本地文件下载

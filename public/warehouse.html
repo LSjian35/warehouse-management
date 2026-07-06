@@ -1736,15 +1736,8 @@
             openFilePreview(file);
         }
         function openFilePreview(file) {
-            const ext = file.name.split('.').pop().toLowerCase();
-            const textExts = ['c','cpp','h','hpp','java','py','js','ts','css','json','xml','yaml','yml','md','sh','sql','go','rs','rb','php','txt','log','cfg','ini','env','gitignore','toml','properties'];
-            if (textExts.includes(ext)) {
-                // 代码/文本 -> 新标签页用预览接口显示纯文本
-                window.open(API_BASE + '/api/files/' + file.id + '/preview', '_blank');
-            } else {
-                // 图片/HTML/视频/音频/PDF等 -> 直接打开文件 URL
-                window.open(file.url, '_blank');
-            }
+            // 所有文件统一走服务端预览接口，新标签页打开
+            window.open(API_BASE + '/api/files/' + file.id + '/preview', '_blank');
         }
 
         function setSort(field) {
