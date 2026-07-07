@@ -15,7 +15,7 @@ const GITHUB_REPO = 'warehouse-management';
 const GITHUB_BRANCH = 'main';
 
 // 临时文件存储目录（用于接收上传文件后再推送到 GitHub）
-const STORAGE_ROOT = process.env.STORAGE_ROOT || './storage';
+const STORAGE_ROOT = process.env.STORAGE_ROOT || path.join(__dirname, 'storage');
 const uploadsDir = path.join(STORAGE_ROOT, 'uploads');
 const dataDir = path.join(STORAGE_ROOT, 'data');
 if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
