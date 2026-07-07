@@ -351,8 +351,11 @@ app.get('/api/files/:id/preview', (req, res) => {
     if (file.url && file.url.startsWith('/local-files/')) {
         filePath = path.join(STORAGE_ROOT, 'files', file.name);
     } else if (file.url) {
-        // GitHub 文件，直接重定向
-        return res.redirect(file.url);
+        // GitHub 文件 -> 用 iframe 嵌入 URL
+        res.send(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>${file.name}</title>
+<style>*{margin:0;padding:0}body{background:#f8f7f4}</style></head><body>
+<iframe src="${file.url}" style="width:100%;height:100vh;border:none"></iframe></body></html>`);
+        return;
     } else {
         return res.status(404).send('文件链接不可用');
     }
