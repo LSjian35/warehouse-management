@@ -452,6 +452,21 @@
         }
         .context-menu-item .ctx-icon { font-size: 16px; width: 20px; text-align: center; }
 
+        /* ===== 框选 & 拖动 ===== */
+        .selection-box {
+            position: fixed;
+            border: 1px dashed var(--accent);
+            background: rgba(124, 77, 255, 0.1);
+            pointer-events: none;
+            z-index: 9999;
+        }
+        .dragging { opacity: 0.5; }
+        .drag-over {
+            background: var(--selected) !important;
+            outline: 2px dashed var(--accent) !important;
+            outline-offset: -2px;
+        }
+
         /* Modal */
         .modal-overlay {
             position: fixed; inset: 0;
@@ -1142,6 +1157,11 @@
         let sortField = 'name';
         let sortDir = 'asc';
         let searchQuery = '';
+        let isSelecting = false;
+        let selectStartX = 0;
+        let selectStartY = 0;
+        let selectBox = null;
+        let ignoreNextClick = false;
 
         document.addEventListener('DOMContentLoaded', () => {
             updateAdminUI();
@@ -1214,6 +1234,7 @@
 
             // Content area click to deselect
             document.getElementById('contentArea').addEventListener('click', (e) => {
+                if (ignoreNextClick) return;
                 if (e.target.id === 'contentArea' || e.target.id === 'itemsContainer' || e.target.classList.contains('icons-view')) {
                     selectedItems = [];
                     renderItems();
@@ -1226,6 +1247,58 @@
                 if (onItem) return; // 子元素会处理自己的右键
                 if (!isAdmin) { e.preventDefault(); return; }
                 showContextMenu(e, 'background', null);
+            });
+
+            // Box selection (框选)
+            document.getElementById('contentArea').addEventListener('mousedown', (e) => {
+                if (e.button !== 0) return;
+                const onItem = e.target.closest('.details-view tbody tr') || e.target.closest('.list-item') || e.target.closest('.icon-item');
+                if (onItem) return;
+                isSelecting = true;
+                selectStartX = e.clientX;
+                selectStartY = e.clientY;
+                selectBox = document.createElement('div');
+                selectBox.className = 'selection-box';
+                selectBox.style.left = selectStartX + 'px';
+                selectBox.style.top = selectStartY + 'px';
+                selectBox.style.width = '0px';
+                selectBox.style.height = '0px';
+                document.body.appendChild(selectBox);
+            });
+
+            document.addEventListener('mousemove', (e) => {
+                if (!isSelecting || !selectBox) return;
+                const x = Math.min(selectStartX, e.clientX);
+                const y = Math.min(selectStartY, e.clientY);
+                const w = Math.abs(e.clientX - selectStartX);
+                const h = Math.abs(e.clientY - selectStartY);
+                selectBox.style.left = x + 'px';
+                selectBox.style.top = y + 'px';
+                selectBox.style.width = w + 'px';
+                selectBox.style.height = h + 'px';
+            });
+
+            document.addEventListener('mouseup', (e) => {
+                if (!isSelecting || !selectBox) return;
+                isSelecting = false;
+                const rect = selectBox.getBoundingClientRect();
+                selectBox.remove();
+                selectBox = null;
+                if (rect.width < 5 || rect.height < 5) return; // 点击而非拖拽
+                const items = document.querySelectorAll('.details-view tbody tr, .list-item, .icon-item');
+                const newSelection = [];
+                items.forEach(item => {
+                    const itemRect = item.getBoundingClientRect();
+                    if (rectsIntersect(rect, itemRect)) {
+                        newSelection.push({ id: parseInt(item.dataset.id), type: item.dataset.type });
+                    }
+                });
+                if (newSelection.length > 0) {
+                    selectedItems = newSelection;
+                    renderItems();
+                    ignoreNextClick = true;
+                    setTimeout(() => ignoreNextClick = false, 50);
+                }
             });
 
             // Context menu items
@@ -1264,6 +1337,15 @@
             });
             return res.json();
         }
+        async function apiPatch(url, data) {
+            const res = await fetch(API_BASE + url, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            });
+            return res.json();
+        }
+
         async function apiDelete(url) {
             const res = await fetch(API_BASE + url, { method: 'DELETE' });
             return res.json();
@@ -1424,6 +1506,7 @@
                 navigateTo(projectId, folder.id);
             });
             row.addEventListener('contextmenu', (e) => showContextMenu(e, 'folder', folder.id));
+            setupDropEvents(row, folder.id);
 
             // Toggle expand
             const toggle = row.querySelector('.tree-toggle');
@@ -1705,23 +1788,8 @@
                     if (e.ctrlKey || e.metaKey) {
                         toggleSelect(id, type);
                     } else if (e.shiftKey) {
-                        // Range select
                         const allIds = Array.from(document.querySelectorAll('.details-view tbody tr')).map(r => ({ id: parseInt(r.dataset.id), type: r.dataset.type }));
-                        if (selectedItems.length > 0) {
-                            const last = selectedItems[selectedItems.length - 1];
-                            const lastIdx = allIds.findIndex(x => x.id === last.id && x.type === last.type);
-                            const curIdx = allIds.findIndex(x => x.id === id && x.type === type);
-                            const start = Math.min(lastIdx, curIdx);
-                            const end = Math.max(lastIdx, curIdx);
-                            for (let i = start; i <= end; i++) {
-                                if (!selectedItems.find(s => s.id === allIds[i].id && s.type === allIds[i].type)) {
-                                    selectedItems.push(allIds[i]);
-                                }
-                            }
-                        } else {
-                            selectedItems.push({ id, type });
-                        }
-                        renderItems();
+                        doRangeSelect(allIds, id, type);
                     } else {
                         selectedItems = [{ id, type }];
                         renderItems();
@@ -1742,6 +1810,8 @@
                     }
                     showContextMenu(e, type, id);
                 });
+                setupDragEvents(row);
+                if (type === 'folder') setupDropEvents(row, id);
             });
         }
 
@@ -1753,6 +1823,9 @@
                     const type = item.dataset.type;
                     if (e.ctrlKey || e.metaKey) {
                         toggleSelect(id, type);
+                    } else if (e.shiftKey) {
+                        const allItems = Array.from(document.querySelectorAll('.list-item')).map(el => ({ id: parseInt(el.dataset.id), type: el.dataset.type }));
+                        doRangeSelect(allItems, id, type);
                     } else {
                         selectedItems = [{ id, type }];
                         renderItems();
@@ -1771,6 +1844,8 @@
                     }
                     showContextMenu(e, type, id);
                 });
+                setupDragEvents(item);
+                if (type === 'folder') setupDropEvents(item, id);
             });
         }
 
@@ -1782,6 +1857,9 @@
                     const type = item.dataset.type;
                     if (e.ctrlKey || e.metaKey) {
                         toggleSelect(id, type);
+                    } else if (e.shiftKey) {
+                        const allItems = Array.from(document.querySelectorAll('.icon-item')).map(el => ({ id: parseInt(el.dataset.id), type: el.dataset.type }));
+                        doRangeSelect(allItems, id, type);
                     } else {
                         selectedItems = [{ id, type }];
                         renderItems();
@@ -1800,7 +1878,27 @@
                     }
                     showContextMenu(e, type, id);
                 });
+                setupDragEvents(item);
+                if (type === 'folder') setupDropEvents(item, id);
             });
+        }
+
+        function doRangeSelect(allItems, id, type) {
+            if (selectedItems.length > 0) {
+                const last = selectedItems[selectedItems.length - 1];
+                const lastIdx = allItems.findIndex(x => x.id === last.id && x.type === last.type);
+                const curIdx = allItems.findIndex(x => x.id === id && x.type === type);
+                const start = Math.min(lastIdx, curIdx);
+                const end = Math.max(lastIdx, curIdx);
+                for (let i = start; i <= end; i++) {
+                    if (!selectedItems.find(s => s.id === allItems[i].id && s.type === allItems[i].type)) {
+                        selectedItems.push(allItems[i]);
+                    }
+                }
+            } else {
+                selectedItems.push({ id, type });
+            }
+            renderItems();
         }
 
         function toggleSelect(id, type) {
@@ -1808,6 +1906,66 @@
             if (idx >= 0) selectedItems.splice(idx, 1);
             else selectedItems.push({ id, type });
             renderItems();
+        }
+
+        function rectsIntersect(r1, r2) {
+            return !(r2.left > r1.right || r2.right < r1.left || r2.top > r1.bottom || r2.bottom < r1.top);
+        }
+
+        function setupDragEvents(element) {
+            element.draggable = true;
+            element.addEventListener('dragstart', (e) => {
+                const id = parseInt(element.dataset.id);
+                const type = element.dataset.type;
+                // 如果拖动的项目不在选中列表中，则只拖动它自己
+                if (!selectedItems.find(s => s.id === id && s.type === type)) {
+                    selectedItems = [{ id, type }];
+                    renderItems();
+                }
+                e.dataTransfer.setData('application/json', JSON.stringify(selectedItems));
+                e.dataTransfer.effectAllowed = 'move';
+                element.classList.add('dragging');
+            });
+            element.addEventListener('dragend', () => {
+                element.classList.remove('dragging');
+                document.querySelectorAll('.drag-over').forEach(el => el.classList.remove('drag-over'));
+            });
+        }
+
+        function setupDropEvents(element, folderId) {
+            element.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                e.dataTransfer.dropEffect = 'move';
+                element.classList.add('drag-over');
+            });
+            element.addEventListener('dragleave', () => {
+                element.classList.remove('drag-over');
+            });
+            element.addEventListener('drop', async (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                element.classList.remove('drag-over');
+                try {
+                    const items = JSON.parse(e.dataTransfer.getData('application/json'));
+                    for (const item of items) {
+                        await moveItem(item.id, item.type, folderId);
+                    }
+                    refreshFolderTree(currentProject, currentFolder);
+                    loadContents();
+                    showToast('移动成功', 'success');
+                } catch (err) {
+                    showToast('移动失败', 'error');
+                }
+            });
+        }
+
+        async function moveItem(id, type, targetFolderId) {
+            if (type === 'folder' && id === targetFolderId) return; // 不能移动到自己
+            if (type === 'file') {
+                await apiPatch(`/api/files/${id}`, { parent_id: targetFolderId, parent_type: 'folder' });
+            } else if (type === 'folder') {
+                await apiPatch(`/api/folders/${id}`, { parent_folder_id: targetFolderId });
+            }
         }
 
         function openItem(item) {
@@ -1931,6 +2089,8 @@
                 } else if (type === 'background') {
                     // 右键空白区域：只能添加，不能打开/下载/删除
                     if (['open','download','delete'].includes(action)) show = false;
+                    // 在项目内部（包括项目根目录和文件夹内）不能添加项目
+                    if (action === 'addProject' && currentProject) show = false;
                 }
 
                 item.style.display = show ? 'flex' : 'none';
@@ -1993,22 +2153,62 @@
             try {
                 const rootFolder = await apiPost('/api/folders', payload);
                 folderMap[rootFolder.id] = rootFolder;
-                // 只上传根目录下的文件（简化版，跳过子文件夹中的文件）
+                const createdFolders = { '': rootFolder.id }; // relativeDirPath -> folderId
+
+                // 解析所有文件路径，按目录分组
+                const dirToFiles = {};
                 for (const file of files) {
                     const relativePath = file.webkitRelativePath;
                     const parts = relativePath.split('/');
-                    if (parts.length > 2) continue; // 跳过子文件夹中的文件
-                    const formData = new FormData();
-                    formData.append('file', file);
-                    formData.append('parent_id', rootFolder.id);
-                    formData.append('parent_type', 'folder');
-                    await fetch(API_BASE + '/api/files', { method: 'POST', body: formData });
+                    // parts[0] = 根文件夹名, parts[last] = 文件名, 中间是子目录
+                    const dirPath = parts.slice(1, -1).join('/');
+                    if (!dirToFiles[dirPath]) dirToFiles[dirPath] = [];
+                    dirToFiles[dirPath].push(file);
                 }
+
+                // 创建所有需要的子文件夹（按深度排序确保父文件夹先创建）
+                const dirs = Object.keys(dirToFiles).filter(d => d !== '').sort((a, b) => a.split('/').length - b.split('/').length);
+                for (const dirPath of dirs) {
+                    const parts = dirPath.split('/');
+                    const name = parts[parts.length - 1];
+                    const parentPath = parts.slice(0, -1).join('/');
+                    const parentId = createdFolders[parentPath] || rootFolder.id;
+                    const folder = await apiPost('/api/folders', {
+                        name, project_id: currentProject, parent_folder_id: parentId
+                    });
+                    createdFolders[dirPath] = folder.id;
+                    folderMap[folder.id] = folder;
+                }
+
+                // 上传所有文件
+                let uploadedCount = 0;
+                let failedCount = 0;
+                for (const [dirPath, fileList] of Object.entries(dirToFiles)) {
+                    const parentId = createdFolders[dirPath] || rootFolder.id;
+                    for (const file of fileList) {
+                        const formData = new FormData();
+                        formData.append('file', file);
+                        formData.append('parent_id', parentId);
+                        formData.append('parent_type', 'folder');
+                        try {
+                            const response = await fetch(API_BASE + '/api/files', { method: 'POST', body: formData });
+                            if (response.ok) uploadedCount++;
+                            else failedCount++;
+                        } catch (e) {
+                            failedCount++;
+                        }
+                    }
+                }
+
                 refreshFolderTree(currentProject, currentFolder);
                 loadContents();
-                showToast('文件夹上传成功', 'success');
+                if (failedCount > 0) {
+                    showToast(`上传完成：${uploadedCount} 成功，${failedCount} 失败`, 'warning');
+                } else {
+                    showToast(`文件夹上传成功，共 ${uploadedCount} 个文件`, 'success');
+                }
             } catch (err) {
-                showToast('上传失败', 'error');
+                showToast('上传失败: ' + err.message, 'error');
             }
         }
 

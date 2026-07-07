@@ -289,6 +289,33 @@ app.delete('/api/folders/:id', (req, res) => {
     res.json({ message: '文件夹已删除' });
 });
 
+// 移动文件夹
+app.patch('/api/folders/:id', (req, res) => {
+    const data = initData();
+    const folderId = parseInt(req.params.id);
+    const { parent_folder_id } = req.body;
+    const folder = data.folders.find(f => f.id === folderId);
+    if (!folder) return res.status(404).json({ error: '文件夹不存在' });
+    // 防止移动到自身或其子文件夹中
+    if (parent_folder_id === folderId) {
+        return res.status(400).json({ error: '不能移动到自身' });
+    }
+    function isDescendant(parentId, childId) {
+        const children = data.folders.filter(f => f.parent_folder_id === parentId);
+        for (const child of children) {
+            if (child.id === childId) return true;
+            if (isDescendant(child.id, childId)) return true;
+        }
+        return false;
+    }
+    if (parent_folder_id && isDescendant(folderId, parseInt(parent_folder_id))) {
+        return res.status(400).json({ error: '不能移动到子文件夹中' });
+    }
+    folder.parent_folder_id = parent_folder_id ? parseInt(parent_folder_id) : null;
+    saveData(data);
+    res.json(folder);
+});
+
 // 获取文件列表
 app.get('/api/files', (req, res) => {
     const data = initData();
@@ -510,6 +537,19 @@ app.delete('/api/files/:id', (req, res) => {
     data.files = data.files.filter(f => f.id !== fileId);
     saveData(data);
     res.json({ message: '文件已删除' });
+});
+
+// 移动文件
+app.patch('/api/files/:id', (req, res) => {
+    const data = initData();
+    const fileId = parseInt(req.params.id);
+    const { parent_id, parent_type } = req.body;
+    const file = data.files.find(f => f.id === fileId);
+    if (!file) return res.status(404).json({ error: '文件不存在' });
+    if (parent_id !== undefined) file.parent_id = parseInt(parent_id);
+    if (parent_type !== undefined) file.parent_type = parent_type;
+    saveData(data);
+    res.json(file);
 });
 
 // 管理员登录验证（密码不暴露在前端）
