@@ -322,11 +322,16 @@ app.post('/api/files', upload.single('file'), async (req, res) => {
 
 // 本地文件下载
 app.get('/local-files/:filename', (req, res) => {
+    try {
     const filePath = path.join(STORAGE_ROOT, 'files', decodeURIComponent(req.params.filename));
     if (fs.existsSync(filePath)) {
         res.sendFile(filePath);
     } else {
         res.status(404).json({ error: '文件不存在' });
+    }
+    } catch (err) {
+        console.error('local-files error:', err);
+        res.status(500).json({ error: '文件读取失败' });
     }
 });
 
