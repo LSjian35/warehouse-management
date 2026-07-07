@@ -1434,7 +1434,7 @@
             row.className = 'tree-item' + (currentProject === project.id && !currentFolder ? ' active' : '');
             row.style.paddingLeft = (12 + level * 16) + 'px';
             row.innerHTML = `
-                <span class="tree-toggle no-children" data-project="${project.id}">▶</span>
+                <span class="tree-toggle" data-project="${project.id}">▶</span>
                 <span class="tree-icon">📦</span>
                 <span class="tree-label">${escapeHtml(project.name)}</span>
             `;
@@ -1472,11 +1472,16 @@
                     const folders = await apiGet(`/api/projects/${projectId}/folders`);
                     allFolders[projectId] = folders;
                     container.innerHTML = '';
-                    folders.forEach(f => {
-                        folderMap[f.id] = f;
-                        const wrapper = createFolderTreeItem(f, projectId, 1);
-                        container.appendChild(wrapper);
-                    });
+                    if (folders.length === 0) {
+                        if (toggleEl) toggleEl.classList.add('no-children');
+                    } else {
+                        if (toggleEl) toggleEl.classList.remove('no-children');
+                        folders.forEach(f => {
+                            folderMap[f.id] = f;
+                            const wrapper = createFolderTreeItem(f, projectId, 1);
+                            container.appendChild(wrapper);
+                        });
+                    }
                     container.dataset.loaded = 'true';
                 } catch (e) {
                     container.innerHTML = '<div style="padding:4px 30px;color:#999;font-size:12px;">无法加载</div>';
@@ -1484,7 +1489,6 @@
             }
 
             container.classList.add('expanded');
-            if (toggleEl) toggleEl.classList.remove('no-children');
             if (toggleEl) toggleEl.classList.add('expanded');
         }
 
