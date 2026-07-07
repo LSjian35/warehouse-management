@@ -1111,6 +1111,7 @@
                 <input type="text" id="modalInput" placeholder="请输入名称">
                 <input type="password" id="modalPassword" class="hidden" placeholder="请输入密码">
                 <input type="file" id="modalFile" class="hidden">
+                <input type="file" id="modalFolderUpload" class="hidden" webkitdirectory directory multiple>
                 <div class="modal-hint" id="modalHint"></div>
             </div>
             <div class="modal-footer">
@@ -1135,6 +1136,7 @@
         let currentItems = []; // items in current view
         let allProjects = [];
         let allFolders = {}; // projectId -> folders[]
+        let folderMap = {}; // folderId -> folder object
         let navHistory = [];
         let navIndex = -1;
         let sortField = 'name';
@@ -1218,6 +1220,14 @@
                 }
             });
 
+            // Content area right-click on empty space (background)
+            document.getElementById('contentArea').addEventListener('contextmenu', (e) => {
+                const onItem = e.target.closest('.details-view tbody tr') || e.target.closest('.list-item') || e.target.closest('.icon-item');
+                if (onItem) return; // 子元素会处理自己的右键
+                if (!isAdmin) { e.preventDefault(); return; }
+                showContextMenu(e, 'background', null);
+            });
+
             // Context menu items
             document.querySelectorAll('.context-menu-item').forEach(item => {
                 item.addEventListener('click', () => {
@@ -1286,9 +1296,24 @@
                 updateNavButtons();
             }
         }
-        function navUp() {
+        async function navUp() {
             if (currentFolder) {
-                navigateTo(currentProject, null);
+                // 如果有父文件夹，导航到父文件夹；否则导航到项目根目录
+                let parentId = null;
+                if (folderMap[currentFolder]) {
+                    parentId = folderMap[currentFolder].parent_folder_id;
+                } else {
+                    try {
+                        const folder = await apiGet(`/api/folders/${currentFolder}`);
+                        folderMap[currentFolder] = folder;
+                        parentId = folder.parent_folder_id;
+                    } catch (e) {}
+                }
+                if (parentId) {
+                    navigateTo(currentProject, parentId);
+                } else {
+                    navigateTo(currentProject, null);
+                }
             } else if (currentProject) {
                 currentProject = null;
                 currentFolder = null;
@@ -1366,19 +1391,85 @@
                     allFolders[projectId] = folders;
                     container.innerHTML = '';
                     folders.forEach(f => {
-                        const fRow = document.createElement('div');
-                        fRow.className = 'tree-item' + (currentFolder === f.id ? ' active' : '');
-                        fRow.style.paddingLeft = '34px';
-                        fRow.innerHTML = `
-                            <span class="tree-icon">📁</span>
-                            <span class="tree-label">${escapeHtml(f.name)}</span>
-                        `;
-                        fRow.addEventListener('click', (e) => {
-                            e.stopPropagation();
-                            navigateTo(projectId, f.id);
-                        });
-                        fRow.addEventListener('contextmenu', (e) => showContextMenu(e, 'folder', f.id));
-                        container.appendChild(fRow);
+                        folderMap[f.id] = f;
+                        const wrapper = createFolderTreeItem(f, projectId, 1);
+                        container.appendChild(wrapper);
+                    });
+                    container.dataset.loaded = 'true';
+                } catch (e) {
+                    container.innerHTML = '<div style="padding:4px 30px;color:#999;font-size:12px;">无法加载</div>';
+                }
+            }
+
+            container.classList.add('expanded');
+            if (toggleEl) toggleEl.classList.remove('no-children');
+            if (toggleEl) toggleEl.classList.add('expanded');
+        }
+
+        function createFolderTreeItem(folder, projectId, level) {
+            const wrapper = document.createElement('div');
+            wrapper.className = 'tree-wrapper';
+            wrapper.dataset.folderId = folder.id;
+
+            const row = document.createElement('div');
+            row.className = 'tree-item' + (currentFolder === folder.id ? ' active' : '');
+            row.style.paddingLeft = (12 + level * 16) + 'px';
+            row.innerHTML = `
+                <span class="tree-toggle no-children" data-folder="${folder.id}">▶</span>
+                <span class="tree-icon">📁</span>
+                <span class="tree-label">${escapeHtml(folder.name)}</span>
+            `;
+            row.addEventListener('click', (e) => {
+                e.stopPropagation();
+                navigateTo(projectId, folder.id);
+            });
+            row.addEventListener('contextmenu', (e) => showContextMenu(e, 'folder', folder.id));
+
+            // Toggle expand
+            const toggle = row.querySelector('.tree-toggle');
+            toggle.addEventListener('click', (e) => {
+                e.stopPropagation();
+                expandFolder(folder.id, projectId, toggle);
+            });
+
+            wrapper.appendChild(row);
+
+            const childrenContainer = document.createElement('div');
+            childrenContainer.className = 'tree-children';
+            childrenContainer.id = 'tree-folder-children-' + folder.id;
+            wrapper.appendChild(childrenContainer);
+
+            return wrapper;
+        }
+
+        function getFolderDepth(folderId) {
+            let depth = 0;
+            let current = folderMap[folderId];
+            while (current && current.parent_folder_id) {
+                depth++;
+                current = folderMap[current.parent_folder_id];
+            }
+            return depth;
+        }
+
+        async function expandFolder(folderId, projectId, toggleEl) {
+            const container = document.getElementById('tree-folder-children-' + folderId);
+            if (container.classList.contains('expanded')) {
+                container.classList.remove('expanded');
+                if (toggleEl) toggleEl.classList.remove('expanded');
+                return;
+            }
+
+            // Load sub-folders if not loaded
+            if (!container.dataset.loaded) {
+                try {
+                    const folders = await apiGet(`/api/projects/${projectId}/folders?parent_folder_id=${folderId}`);
+                    container.innerHTML = '';
+                    const depth = getFolderDepth(folderId);
+                    folders.forEach(f => {
+                        folderMap[f.id] = f;
+                        const wrapper = createFolderTreeItem(f, projectId, depth + 1);
+                        container.appendChild(wrapper);
                     });
                     container.dataset.loaded = 'true';
                 } catch (e) {
@@ -1404,13 +1495,9 @@
             document.querySelectorAll('.tree-item').forEach(el => el.classList.remove('active'));
             if (folderId) {
                 // Find folder in tree and activate
-                const treeChildren = document.getElementById('tree-children-' + projectId);
-                if (treeChildren) {
-                    Array.from(treeChildren.children).forEach(child => {
-                        if (child.textContent.includes(getFolderName(projectId, folderId))) {
-                            child.classList.add('active');
-                        }
-                    });
+                const folderWrapper = document.querySelector(`.tree-wrapper[data-folder-id="${folderId}"]`);
+                if (folderWrapper) {
+                    folderWrapper.querySelector('.tree-item').classList.add('active');
                 }
             } else {
                 const treeWrappers = document.querySelectorAll('.tree-wrapper');
@@ -1461,7 +1548,15 @@
                     });
                 });
             } else {
-                // In folder, show only files
+                // In folder, show sub-folders + files (支持嵌套文件夹)
+                const folders = await apiGet(`/api/projects/${currentProject}/folders?parent_folder_id=${currentFolder}`);
+                folders.forEach(f => {
+                    folderMap[f.id] = f;
+                    items.push({
+                        id: f.id, type: 'folder', name: f.name,
+                        date: f.created_at || '-', itemType: '文件夹', size: '-'
+                    });
+                });
                 const files = await apiGet(`/api/files?parent_id=${currentFolder}&parent_type=folder`);
                 files.forEach(f => {
                     items.push({
@@ -1790,7 +1885,6 @@
 
         // ==================== Context Menu ====================
         function showContextMenu(e, type, id) {
-            if (!isAdmin && type !== 'project' && type !== 'folder') return;
             e.preventDefault();
             contextTarget = { type, id };
             const menu = document.getElementById('contextMenu');
@@ -1798,28 +1892,48 @@
             menu.style.left = Math.min(e.pageX, window.innerWidth - 200) + 'px';
             menu.style.top = Math.min(e.pageY, window.innerHeight - 200) + 'px';
 
-            // Hide/show items based on context
             const items = menu.querySelectorAll('.context-menu-item');
             items.forEach(item => {
                 const action = item.dataset.action;
+                let show = true;
+
+                // 非管理员隐藏所有管理操作
                 if (!isAdmin) {
                     if (['addFile','addFolder','addProject','delete'].includes(action)) {
-                        item.style.display = 'none';
-                    } else {
-                        item.style.display = 'flex';
+                        show = false;
                     }
-                } else {
-                    item.style.display = 'flex';
                 }
-                // Disable open/download for folders/files appropriately
-                if (action === 'open') {
-                    item.style.display = (type === 'folder' || type === 'file') ? 'flex' : 'none';
-                    item.querySelector('.ctx-icon').textContent = type === 'folder' ? '📂' : '▶';
-                    item.childNodes[1].textContent = type === 'folder' ? '打开' : '打开';
+
+                // 根据右键目标类型控制菜单项（参考 Windows 资源管理器行为）
+                if (type === 'file') {
+                    // 右键文件：只能打开/下载/删除，不能添加
+                    if (['addFile','addFolder','addProject'].includes(action)) show = false;
+                    if (action === 'open') {
+                        item.querySelector('.ctx-icon').textContent = '▶';
+                        item.childNodes[1].textContent = '打开';
+                    }
+                    if (action === 'download') show = true;
+                } else if (type === 'folder') {
+                    // 右键文件夹：可以添加文件/子文件夹，不能添加项目
+                    if (action === 'addProject') show = false;
+                    if (action === 'open') {
+                        item.querySelector('.ctx-icon').textContent = '📂';
+                        item.childNodes[1].textContent = '打开';
+                    }
+                    if (action === 'download') show = false;
+                } else if (type === 'project') {
+                    // 右键项目：可以添加文件/文件夹/项目
+                    if (action === 'open') {
+                        item.querySelector('.ctx-icon').textContent = '📂';
+                        item.childNodes[1].textContent = '打开';
+                    }
+                    if (action === 'download') show = false;
+                } else if (type === 'background') {
+                    // 右键空白区域：只能添加，不能打开/下载/删除
+                    if (['open','download','delete'].includes(action)) show = false;
                 }
-                if (action === 'download') {
-                    item.style.display = type === 'file' ? 'flex' : 'none';
-                }
+
+                item.style.display = show ? 'flex' : 'none';
             });
         }
 
@@ -1854,17 +1968,58 @@
         function showAddFolder() {
             if (!isAdmin) return;
             if (!currentProject) { showToast('请先选择一个项目', 'error'); return; }
-            showModal('添加文件夹', '请输入文件夹名称', (name) => {
-                apiPost('/api/folders', { name, project_id: currentProject }).then(() => {
-                    // Refresh
-                    if (currentProject) {
-                        const container = document.getElementById('tree-children-' + currentProject);
-                        if (container) container.dataset.loaded = '';
-                        loadContents();
-                    }
-                    showToast('文件夹已创建', 'success');
-                }).catch(() => showToast('创建失败', 'error'));
-            });
+            document.getElementById('modalTitle').textContent = '添加文件夹';
+            const input = document.getElementById('modalInput');
+            input.placeholder = '请输入文件夹名称（或选择本地文件夹）';
+            input.value = '';
+            input.classList.remove('hidden');
+            document.getElementById('modalPassword').classList.add('hidden');
+            document.getElementById('modalFile').classList.add('hidden');
+            const folderUpload = document.getElementById('modalFolderUpload');
+            folderUpload.classList.remove('hidden');
+            folderUpload.value = '';
+            document.getElementById('modalHint').textContent = '选择本地文件夹将自动创建同名文件夹并上传其中文件';
+            document.getElementById('modalOverlay').classList.add('active');
+            document.getElementById('modalConfirmBtn').className = 'modal-btn confirm';
+            document.getElementById('modalConfirmBtn').textContent = '确定';
+            modalCallback = null;
+            modalMode = 'folder';
+            setTimeout(() => input.focus(), 100);
+        }
+
+        async function handleFolderUpload(folderName, files) {
+            const payload = { name: folderName, project_id: currentProject };
+            if (currentFolder) payload.parent_folder_id = currentFolder;
+            try {
+                const rootFolder = await apiPost('/api/folders', payload);
+                folderMap[rootFolder.id] = rootFolder;
+                // 只上传根目录下的文件（简化版，跳过子文件夹中的文件）
+                for (const file of files) {
+                    const relativePath = file.webkitRelativePath;
+                    const parts = relativePath.split('/');
+                    if (parts.length > 2) continue; // 跳过子文件夹中的文件
+                    const formData = new FormData();
+                    formData.append('file', file);
+                    formData.append('parent_id', rootFolder.id);
+                    formData.append('parent_type', 'folder');
+                    await fetch(API_BASE + '/api/files', { method: 'POST', body: formData });
+                }
+                refreshFolderTree(currentProject, currentFolder);
+                loadContents();
+                showToast('文件夹上传成功', 'success');
+            } catch (err) {
+                showToast('上传失败', 'error');
+            }
+        }
+
+        function refreshFolderTree(projectId, folderId) {
+            if (!folderId) {
+                const container = document.getElementById('tree-children-' + projectId);
+                if (container) container.dataset.loaded = '';
+            } else {
+                const container = document.getElementById('tree-folder-children-' + folderId);
+                if (container) container.dataset.loaded = '';
+            }
         }
 
         function showAddFile() {
@@ -1907,13 +2062,21 @@
                     if (currentProject === id) { currentProject = null; currentFolder = null; showEmptyState(); }
                     loadProjects();
                 } else if (type === 'folder') {
+                    const deletedFolder = folderMap[id];
                     await apiDelete(`/api/folders/${id}`);
                     if (currentFolder === id) currentFolder = null;
                     // Refresh tree and content
                     if (currentProject) {
-                        const container = document.getElementById('tree-children-' + currentProject);
-                        if (container) container.dataset.loaded = '';
+                        if (deletedFolder && deletedFolder.parent_folder_id) {
+                            const container = document.getElementById('tree-folder-children-' + deletedFolder.parent_folder_id);
+                            if (container) container.dataset.loaded = '';
+                        } else {
+                            const container = document.getElementById('tree-children-' + currentProject);
+                            if (container) container.dataset.loaded = '';
+                        }
                     }
+                    // 清理 folderMap 中的记录
+                    delete folderMap[id];
                     await loadContents();
                 } else if (type === 'file') {
                     await apiDelete(`/api/files/${id}`);
@@ -1984,6 +2147,8 @@
         function closeModal() {
             document.getElementById('modalOverlay').classList.remove('active');
             document.getElementById('modalFile').value = '';
+            document.getElementById('modalFolderUpload').value = '';
+            document.getElementById('modalFolderUpload').classList.add('hidden');
             modalCallback = null;
         }
 
@@ -1999,6 +2164,25 @@
                 closeModal();
             } else if (modalMode === 'file') {
                 closeModal();
+            } else if (modalMode === 'folder') {
+                const input = document.getElementById('modalInput');
+                const folderUpload = document.getElementById('modalFolderUpload');
+                const name = input.value.trim();
+                if (folderUpload.files && folderUpload.files.length > 0) {
+                    const folderName = name || folderUpload.files[0].webkitRelativePath.split('/')[0];
+                    handleFolderUpload(folderName, folderUpload.files);
+                    closeModal();
+                } else if (name) {
+                    const payload = { name, project_id: currentProject };
+                    if (currentFolder) payload.parent_folder_id = currentFolder;
+                    apiPost('/api/folders', payload).then((folder) => {
+                        folderMap[folder.id] = folder;
+                        refreshFolderTree(currentProject, currentFolder);
+                        loadContents();
+                        showToast('文件夹已创建', 'success');
+                    }).catch(() => showToast('创建失败', 'error'));
+                    closeModal();
+                }
             } else {
                 const input = document.getElementById('modalInput');
                 if (modalCallback && input.value.trim()) {

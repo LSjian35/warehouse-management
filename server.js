@@ -229,18 +229,33 @@ app.delete('/api/projects/:id', (req, res) => {
 app.get('/api/projects/:id/folders', (req, res) => {
     const data = initData();
     const projectId = parseInt(req.params.id);
-    const folders = data.folders.filter(f => f.project_id === projectId);
+    const parentFolderId = req.query.parent_folder_id ? parseInt(req.query.parent_folder_id) : null;
+    const folders = data.folders.filter(f => {
+        if (f.project_id !== projectId) return false;
+        const folderParentId = f.parent_folder_id || null;
+        return folderParentId === parentFolderId;
+    });
     res.json(folders);
+});
+
+// 获取单个文件夹
+app.get('/api/folders/:id', (req, res) => {
+    const data = initData();
+    const folderId = parseInt(req.params.id);
+    const folder = data.folders.find(f => f.id === folderId);
+    if (!folder) return res.status(404).json({ error: '文件夹不存在' });
+    res.json(folder);
 });
 
 // 创建文件夹
 app.post('/api/folders', (req, res) => {
     const data = initData();
-    const { name, project_id } = req.body;
+    const { name, project_id, parent_folder_id } = req.body;
     const folder = {
         id: data.nextId.folder++,
         name,
         project_id: parseInt(project_id),
+        parent_folder_id: parent_folder_id ? parseInt(parent_folder_id) : null,
         created_at: new Date().toISOString()
     };
     data.folders.push(folder);
@@ -253,8 +268,22 @@ app.delete('/api/folders/:id', (req, res) => {
     const data = initData();
     const folderId = parseInt(req.params.id);
     
-    data.files = data.files.filter(f => !(f.parent_id === folderId && f.parent_type === 'folder'));
-    data.folders = data.folders.filter(f => f.id !== folderId);
+    // 递归获取所有子文件夹 ID
+    function getAllSubFolderIds(parentId) {
+        const ids = [parentId];
+        const children = data.folders.filter(f => f.parent_folder_id === parentId);
+        for (const child of children) {
+            ids.push(...getAllSubFolderIds(child.id));
+        }
+        return ids;
+    }
+    
+    const allFolderIds = getAllSubFolderIds(folderId);
+    
+    // 删除这些文件夹中的所有文件
+    data.files = data.files.filter(f => !(f.parent_type === 'folder' && allFolderIds.includes(f.parent_id)));
+    // 删除这些文件夹
+    data.folders = data.folders.filter(f => !allFolderIds.includes(f.id));
     
     saveData(data);
     res.json({ message: '文件夹已删除' });
