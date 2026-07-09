@@ -1078,7 +1078,8 @@
                     <button class="toolbar-btn primary" onclick="showAddProject()" title="添加项目">➕ 项目</button>
                     <button class="toolbar-btn" onclick="showAddFolder()" title="添加文件夹">➕ 文件夹</button>
                     <button class="toolbar-btn" onclick="showAddFile()" title="添加文件">➕ 文件</button>
-                    <button class="toolbar-btn" onclick="deleteSelected()" title="删除选中">🗑 删除</button>
+                    <button class="toolbar-btn" id="btnOpen" onclick="openSelected()" title="打开选中" disabled>▶ 打开</button>
+                    <button class="toolbar-btn" id="btnDelete" onclick="deleteSelected()" title="删除选中" disabled>🗑 删除</button>
                 </div>
                 <input type="text" class="search-box" id="searchBox" placeholder="搜索..." oninput="handleSearch()">
                 <div class="view-toggle" id="viewToggle">
@@ -1327,27 +1328,33 @@
         // ==================== API Helpers ====================
         async function apiGet(url) {
             const res = await fetch(API_BASE + url);
+            if (!res.ok) throw new Error(`请求失败: ${res.status} ${res.statusText}`);
             return res.json();
         }
+
         async function apiPost(url, data) {
             const res = await fetch(API_BASE + url, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(data)
             });
+            if (!res.ok) throw new Error(`请求失败: ${res.status} ${res.statusText}`);
             return res.json();
         }
+
         async function apiPatch(url, data) {
             const res = await fetch(API_BASE + url, {
                 method: 'PATCH',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(data)
             });
+            if (!res.ok) throw new Error(`请求失败: ${res.status} ${res.statusText}`);
             return res.json();
         }
 
         async function apiDelete(url) {
             const res = await fetch(API_BASE + url, { method: 'DELETE' });
+            if (!res.ok) throw new Error(`请求失败: ${res.status} ${res.statusText}`);
             return res.json();
         }
 
@@ -1469,7 +1476,7 @@
             // Load folders if not loaded
             if (!container.dataset.loaded) {
                 try {
-                    const folders = await apiGet(`/api/projects/${projectId}/folders`);
+                    const folders = allFolders[projectId] || await apiGet(`/api/projects/${projectId}/folders`);
                     allFolders[projectId] = folders;
                     container.innerHTML = '';
                     if (folders.length === 0) {
@@ -1618,7 +1625,10 @@
 
             // If at project root, show folders + files
             if (!currentFolder) {
-                const folders = await apiGet(`/api/projects/${currentProject}/folders`);
+                const [folders, files] = await Promise.all([
+                    apiGet(`/api/projects/${currentProject}/folders`),
+                    apiGet(`/api/files?parent_id=${currentProject}&parent_type=project`)
+                ]);
                 allFolders[currentProject] = folders;
                 folders.forEach(f => {
                     items.push({
@@ -1626,7 +1636,6 @@
                         date: f.created_at || '-', itemType: '文件夹', size: '-'
                     });
                 });
-                const files = await apiGet(`/api/files?parent_id=${currentProject}&parent_type=project`);
                 files.forEach(f => {
                     items.push({
                         id: f.id, type: 'file', name: f.name,
@@ -1636,7 +1645,10 @@
                 });
             } else {
                 // In folder, show sub-folders + files (支持嵌套文件夹)
-                const folders = await apiGet(`/api/projects/${currentProject}/folders?parent_folder_id=${currentFolder}`);
+                const [folders, files] = await Promise.all([
+                    apiGet(`/api/projects/${currentProject}/folders?parent_folder_id=${currentFolder}`),
+                    apiGet(`/api/files?parent_id=${currentFolder}&parent_type=folder`)
+                ]);
                 folders.forEach(f => {
                     folderMap[f.id] = f;
                     items.push({
@@ -1644,7 +1656,6 @@
                         date: f.created_at || '-', itemType: '文件夹', size: '-'
                     });
                 });
-                const files = await apiGet(`/api/files?parent_id=${currentFolder}&parent_type=folder`);
                 files.forEach(f => {
                     items.push({
                         id: f.id, type: 'file', name: f.name,
@@ -1719,6 +1730,7 @@
                 attachIconEvents();
             }
             updateStatusBar(filtered.length);
+            updateToolbarState();
         }
 
         function renderDetailsView(items) {
@@ -1980,6 +1992,12 @@
             }
         }
 
+        function openSelected() {
+            if (selectedItems.length === 1) {
+                openItem(selectedItems[0]);
+            }
+        }
+
         // ==================== File Preview ====================
         function previewFile(id) {
             let file = currentItems.find(f => f.id === id);
@@ -2043,6 +2061,13 @@
             } else {
                 document.getElementById('statusRight').textContent = '';
             }
+        }
+
+        function updateToolbarState() {
+            const btnOpen = document.getElementById('btnOpen');
+            const btnDelete = document.getElementById('btnDelete');
+            if (btnOpen) btnOpen.disabled = selectedItems.length !== 1;
+            if (btnDelete) btnDelete.disabled = selectedItems.length === 0 || !isAdmin;
         }
 
         // ==================== Context Menu ====================
