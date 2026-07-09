@@ -1331,35 +1331,87 @@
 
         // ==================== API Helpers ====================
         async function apiGet(url) {
-            const res = await fetch(API_BASE + url);
-            if (!res.ok) throw new Error(`请求失败: ${res.status} ${res.statusText}`);
-            return res.json();
+            try {
+                const res = await fetch(API_BASE + url);
+                if (!res.ok) {
+                    const text = await res.text();
+                    let msg = `请求失败: ${res.status} ${res.statusText}`;
+                    try { const json = JSON.parse(text); if (json.error) msg += ' - ' + json.error; }
+                    catch(e) { if (text.includes('<!DOCTYPE') || text.includes('<html')) msg += ' (服务器返回了HTML错误页面，请检查后端是否正常运行)'; else if (text) msg += ' - ' + text.substring(0, 200); }
+                    console.error('[apiGet]', url, msg, text.substring(0, 500));
+                    throw new Error(msg);
+                }
+                return res.json();
+            } catch (err) {
+                if (err.message && err.message.includes('请求失败')) throw err;
+                console.error('[apiGet] 网络错误', url, err.message);
+                throw new Error('网络请求失败，请检查网络连接: ' + err.message);
+            }
         }
 
         async function apiPost(url, data) {
-            const res = await fetch(API_BASE + url, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(data)
-            });
-            if (!res.ok) throw new Error(`请求失败: ${res.status} ${res.statusText}`);
-            return res.json();
+            try {
+                const res = await fetch(API_BASE + url, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+                if (!res.ok) {
+                    const text = await res.text();
+                    let msg = `请求失败: ${res.status} ${res.statusText}`;
+                    try { const json = JSON.parse(text); if (json.error) msg += ' - ' + json.error; }
+                    catch(e) { if (text) msg += ' - ' + text.substring(0, 200); }
+                    console.error('[apiPost]', url, msg);
+                    throw new Error(msg);
+                }
+                return res.json();
+            } catch (err) {
+                if (err.message && err.message.includes('请求失败')) throw err;
+                console.error('[apiPost] 网络错误', url, err.message);
+                throw new Error('网络请求失败: ' + err.message);
+            }
         }
 
         async function apiPatch(url, data) {
-            const res = await fetch(API_BASE + url, {
-                method: 'PATCH',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(data)
-            });
-            if (!res.ok) throw new Error(`请求失败: ${res.status} ${res.statusText}`);
-            return res.json();
+            try {
+                const res = await fetch(API_BASE + url, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+                if (!res.ok) {
+                    const text = await res.text();
+                    let msg = `请求失败: ${res.status} ${res.statusText}`;
+                    try { const json = JSON.parse(text); if (json.error) msg += ' - ' + json.error; }
+                    catch(e) { if (text) msg += ' - ' + text.substring(0, 200); }
+                    console.error('[apiPatch]', url, msg);
+                    throw new Error(msg);
+                }
+                return res.json();
+            } catch (err) {
+                if (err.message && err.message.includes('请求失败')) throw err;
+                console.error('[apiPatch] 网络错误', url, err.message);
+                throw new Error('网络请求失败: ' + err.message);
+            }
         }
 
         async function apiDelete(url) {
-            const res = await fetch(API_BASE + url, { method: 'DELETE' });
-            if (!res.ok) throw new Error(`请求失败: ${res.status} ${res.statusText}`);
-            return res.json();
+            try {
+                const res = await fetch(API_BASE + url, { method: 'DELETE' });
+                if (!res.ok) {
+                    const text = await res.text();
+                    let msg = `请求失败: ${res.status} ${res.statusText}`;
+                    try { const json = JSON.parse(text); if (json.error) msg += ' - ' + json.error; }
+                    catch(e) { if (text) msg += ' - ' + text.substring(0, 200); }
+                    console.error('[apiDelete]', url, msg);
+                    throw new Error(msg);
+                }
+                return res.json();
+            } catch (err) {
+                if (err.message && err.message.includes('请求失败')) throw err;
+                console.error('[apiDelete] 网络错误', url, err.message);
+                throw new Error('网络请求失败: ' + err.message);
+            }
         }
 
         // ==================== Navigation History ====================
