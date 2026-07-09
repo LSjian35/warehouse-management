@@ -1692,13 +1692,15 @@
                         apiGet(`/api/files?parent_id=${currentProject}&parent_type=project`)
                     ]);
                     allFolders[currentProject] = folders;
-                    folders.forEach(f => {
+                    (folders || []).forEach(f => {
+                        if (!f) return;
                         items.push({
                             id: f.id, type: 'folder', name: f.name,
                             date: f.created_at || '-', itemType: '文件夹', size: '-'
                         });
                     });
-                    files.forEach(f => {
+                    (files || []).forEach(f => {
+                        if (!f) return;
                         items.push({
                             id: f.id, type: 'file', name: f.name,
                             date: f.created_at || '-', itemType: f.type || '文件',
@@ -1711,14 +1713,16 @@
                         apiGet(`/api/projects/${currentProject}/folders?parent_folder_id=${currentFolder}`),
                         apiGet(`/api/files?parent_id=${currentFolder}&parent_type=folder`)
                     ]);
-                    folders.forEach(f => {
+                    (folders || []).forEach(f => {
+                        if (!f) return;
                         folderMap[f.id] = f;
                         items.push({
                             id: f.id, type: 'folder', name: f.name,
                             date: f.created_at || '-', itemType: '文件夹', size: '-'
                         });
                     });
-                    files.forEach(f => {
+                    (files || []).forEach(f => {
+                        if (!f) return;
                         items.push({
                             id: f.id, type: 'file', name: f.name,
                             date: f.created_at || '-', itemType: f.type || '文件',
@@ -1733,6 +1737,7 @@
                 document.getElementById('loadingState').classList.add('hidden');
                 document.getElementById('itemsContainer').classList.remove('hidden');
             } catch (err) {
+                console.error('loadContents error:', err.stack || err);
                 document.getElementById('loadingState').classList.add('hidden');
                 document.getElementById('emptyState').classList.remove('hidden');
                 showToast('加载失败: ' + err.message, 'error');
@@ -1864,10 +1869,10 @@
 
         function attachRowEvents() {
             document.querySelectorAll('.details-view tbody tr').forEach(row => {
+                const id = parseInt(row.dataset.id);
+                const type = row.dataset.type;
                 row.addEventListener('click', (e) => {
                     e.stopPropagation();
-                    const id = parseInt(row.dataset.id);
-                    const type = row.dataset.type;
                     if (e.ctrlKey || e.metaKey) {
                         toggleSelect(id, type);
                     } else if (e.shiftKey) {
@@ -1879,14 +1884,10 @@
                     }
                 });
                 row.addEventListener('dblclick', () => {
-                    const id = parseInt(row.dataset.id);
-                    const type = row.dataset.type;
                     openItem({ id, type });
                 });
                 row.addEventListener('contextmenu', (e) => {
                     e.preventDefault();
-                    const id = parseInt(row.dataset.id);
-                    const type = row.dataset.type;
                     if (!selectedItems.find(s => s.id === id && s.type === type)) {
                         selectedItems = [{ id, type }];
                         renderItems();
@@ -1900,10 +1901,10 @@
 
         function attachListEvents() {
             document.querySelectorAll('.list-item').forEach(item => {
+                const id = parseInt(item.dataset.id);
+                const type = item.dataset.type;
                 item.addEventListener('click', (e) => {
                     e.stopPropagation();
-                    const id = parseInt(item.dataset.id);
-                    const type = item.dataset.type;
                     if (e.ctrlKey || e.metaKey) {
                         toggleSelect(id, type);
                     } else if (e.shiftKey) {
@@ -1915,12 +1916,10 @@
                     }
                 });
                 item.addEventListener('dblclick', () => {
-                    openItem({ id: parseInt(item.dataset.id), type: item.dataset.type });
+                    openItem({ id, type });
                 });
                 item.addEventListener('contextmenu', (e) => {
                     e.preventDefault();
-                    const id = parseInt(item.dataset.id);
-                    const type = item.dataset.type;
                     if (!selectedItems.find(s => s.id === id && s.type === type)) {
                         selectedItems = [{ id, type }];
                         renderItems();
@@ -1934,10 +1933,10 @@
 
         function attachIconEvents() {
             document.querySelectorAll('.icon-item').forEach(item => {
+                const id = parseInt(item.dataset.id);
+                const type = item.dataset.type;
                 item.addEventListener('click', (e) => {
                     e.stopPropagation();
-                    const id = parseInt(item.dataset.id);
-                    const type = item.dataset.type;
                     if (e.ctrlKey || e.metaKey) {
                         toggleSelect(id, type);
                     } else if (e.shiftKey) {
@@ -1949,12 +1948,10 @@
                     }
                 });
                 item.addEventListener('dblclick', () => {
-                    openItem({ id: parseInt(item.dataset.id), type: item.dataset.type });
+                    openItem({ id, type });
                 });
                 item.addEventListener('contextmenu', (e) => {
                     e.preventDefault();
-                    const id = parseInt(item.dataset.id);
-                    const type = item.dataset.type;
                     if (!selectedItems.find(s => s.id === id && s.type === type)) {
                         selectedItems = [{ id, type }];
                         renderItems();
