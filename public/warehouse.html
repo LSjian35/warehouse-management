@@ -1096,6 +1096,10 @@
                     <div class="empty-text">请从左侧选择一个项目</div>
                     <div class="empty-subtext">点击项目查看其内容</div>
                 </div>
+                <div class="empty-state hidden" id="loadingState">
+                    <div class="empty-icon loading-spin">⏳</div>
+                    <div class="empty-text">加载中...</div>
+                </div>
                 <div id="itemsContainer" class="hidden"></div>
             </div>
 
@@ -1621,55 +1625,66 @@
                 return;
             }
 
-            const items = [];
-
-            // If at project root, show folders + files
-            if (!currentFolder) {
-                const [folders, files] = await Promise.all([
-                    apiGet(`/api/projects/${currentProject}/folders`),
-                    apiGet(`/api/files?parent_id=${currentProject}&parent_type=project`)
-                ]);
-                allFolders[currentProject] = folders;
-                folders.forEach(f => {
-                    items.push({
-                        id: f.id, type: 'folder', name: f.name,
-                        date: f.created_at || '-', itemType: '文件夹', size: '-'
-                    });
-                });
-                files.forEach(f => {
-                    items.push({
-                        id: f.id, type: 'file', name: f.name,
-                        date: f.created_at || '-', itemType: f.type || '文件',
-                        size: f.size ? formatSize(f.size) : '-', rawType: f.type
-                    });
-                });
-            } else {
-                // In folder, show sub-folders + files (支持嵌套文件夹)
-                const [folders, files] = await Promise.all([
-                    apiGet(`/api/projects/${currentProject}/folders?parent_folder_id=${currentFolder}`),
-                    apiGet(`/api/files?parent_id=${currentFolder}&parent_type=folder`)
-                ]);
-                folders.forEach(f => {
-                    folderMap[f.id] = f;
-                    items.push({
-                        id: f.id, type: 'folder', name: f.name,
-                        date: f.created_at || '-', itemType: '文件夹', size: '-'
-                    });
-                });
-                files.forEach(f => {
-                    items.push({
-                        id: f.id, type: 'file', name: f.name,
-                        date: f.created_at || '-', itemType: f.type || '文件',
-                        size: f.size ? formatSize(f.size) : '-', rawType: f.type
-                    });
-                });
-            }
-
-            currentItems = items;
-            sortItems();
-            renderItems();
+            // Show loading
             document.getElementById('emptyState').classList.add('hidden');
-            document.getElementById('itemsContainer').classList.remove('hidden');
+            document.getElementById('itemsContainer').classList.add('hidden');
+            document.getElementById('loadingState').classList.remove('hidden');
+
+            try {
+                const items = [];
+
+                // If at project root, show folders + files
+                if (!currentFolder) {
+                    const [folders, files] = await Promise.all([
+                        apiGet(`/api/projects/${currentProject}/folders`),
+                        apiGet(`/api/files?parent_id=${currentProject}&parent_type=project`)
+                    ]);
+                    allFolders[currentProject] = folders;
+                    folders.forEach(f => {
+                        items.push({
+                            id: f.id, type: 'folder', name: f.name,
+                            date: f.created_at || '-', itemType: '文件夹', size: '-'
+                        });
+                    });
+                    files.forEach(f => {
+                        items.push({
+                            id: f.id, type: 'file', name: f.name,
+                            date: f.created_at || '-', itemType: f.type || '文件',
+                            size: f.size ? formatSize(f.size) : '-', rawType: f.type
+                        });
+                    });
+                } else {
+                    // In folder, show sub-folders + files (支持嵌套文件夹)
+                    const [folders, files] = await Promise.all([
+                        apiGet(`/api/projects/${currentProject}/folders?parent_folder_id=${currentFolder}`),
+                        apiGet(`/api/files?parent_id=${currentFolder}&parent_type=folder`)
+                    ]);
+                    folders.forEach(f => {
+                        folderMap[f.id] = f;
+                        items.push({
+                            id: f.id, type: 'folder', name: f.name,
+                            date: f.created_at || '-', itemType: '文件夹', size: '-'
+                        });
+                    });
+                    files.forEach(f => {
+                        items.push({
+                            id: f.id, type: 'file', name: f.name,
+                            date: f.created_at || '-', itemType: f.type || '文件',
+                            size: f.size ? formatSize(f.size) : '-', rawType: f.type
+                        });
+                    });
+                }
+
+                currentItems = items;
+                sortItems();
+                renderItems();
+                document.getElementById('loadingState').classList.add('hidden');
+                document.getElementById('itemsContainer').classList.remove('hidden');
+            } catch (err) {
+                document.getElementById('loadingState').classList.add('hidden');
+                document.getElementById('emptyState').classList.remove('hidden');
+                showToast('加载失败: ' + err.message, 'error');
+            }
         }
 
         function showEmptyState() {
