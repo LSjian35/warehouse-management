@@ -1116,6 +1116,10 @@
         <div class="context-menu-item" data-action="open"><span class="ctx-icon">📂</span>打开</div>
         <div class="context-menu-item" data-action="download"><span class="ctx-icon">⬇</span>下载</div>
         <div class="context-menu-separator"></div>
+        <div class="context-menu-item" data-action="rename"><span class="ctx-icon">✏️</span>重命名</div>
+        <div class="context-menu-item" data-action="copyUrl"><span class="ctx-icon">📋</span>复制地址</div>
+        <div class="context-menu-item" data-action="properties"><span class="ctx-icon">ℹ️</span>属性</div>
+        <div class="context-menu-separator"></div>
         <div class="context-menu-item" data-action="addFile"><span class="ctx-icon">📄</span>添加文件</div>
         <div class="context-menu-item" data-action="addFolder"><span class="ctx-icon">📁</span>添加文件夹</div>
         <div class="context-menu-item" data-action="addProject"><span class="ctx-icon">📦</span>添加项目</div>
@@ -2077,6 +2081,22 @@
             openFilePreview(file);
         }
         function openFilePreview(file) {
+            if (file.name && file.name.toLowerCase().endsWith('.url')) {
+                fetch(API_BASE + file.url)
+                    .then(r => r.text())
+                    .then(text => {
+                        const match = text.match(/URL=(.+)/i);
+                        if (match) {
+                            window.open(match[1].trim(), '_blank');
+                        } else {
+                            window.open(API_BASE + '/api/files/' + file.id + '/preview', '_blank');
+                        }
+                    })
+                    .catch(() => {
+                        window.open(API_BASE + '/api/files/' + file.id + '/preview', '_blank');
+                    });
+                return;
+            }
             // 所有文件统一走服务端预览接口，新标签页打开
             window.open(API_BASE + '/api/files/' + file.id + '/preview', '_blank');
         }
@@ -2152,14 +2172,14 @@
 
                 // 非管理员隐藏所有管理操作
                 if (!isAdmin) {
-                    if (['addFile','addFolder','addProject','delete'].includes(action)) {
+                    if (['addFile','addFolder','addProject','delete','rename'].includes(action)) {
                         show = false;
                     }
                 }
 
                 // 根据右键目标类型控制菜单项（参考 Windows 资源管理器行为）
                 if (type === 'file') {
-                    // 右键文件：只能打开/下载/删除，不能添加
+                    // 右键文件：只能打开/下载/删除/重命名/属性，不能添加
                     if (['addFile','addFolder','addProject'].includes(action)) show = false;
                     if (action === 'open') {
                         item.querySelector('.ctx-icon').textContent = '▶';
@@ -2167,23 +2187,22 @@
                     }
                     if (action === 'download') show = true;
                 } else if (type === 'folder') {
-                    // 右键文件夹：可以添加文件/子文件夹，不能添加项目
-                    if (action === 'addProject') show = false;
+                    // 右键文件夹：可以添加文件/子文件夹，不能添加项目/下载/复制地址
+                    if (['addProject','download','copyUrl'].includes(action)) show = false;
                     if (action === 'open') {
                         item.querySelector('.ctx-icon').textContent = '📂';
                         item.childNodes[1].textContent = '打开';
                     }
-                    if (action === 'download') show = false;
                 } else if (type === 'project') {
-                    // 右键项目：可以添加文件/文件夹/项目
+                    // 右键项目：可以添加文件/文件夹/项目，不能下载/复制地址
+                    if (['download','copyUrl'].includes(action)) show = false;
                     if (action === 'open') {
                         item.querySelector('.ctx-icon').textContent = '📂';
                         item.childNodes[1].textContent = '打开';
                     }
-                    if (action === 'download') show = false;
                 } else if (type === 'background') {
-                    // 右键空白区域：只能添加，不能打开/下载/删除
-                    if (['open','download','delete'].includes(action)) show = false;
+                    // 右键空白区域：只能添加，不能打开/下载/删除/重命名/复制地址/属性
+                    if (['open','download','delete','rename','copyUrl','properties'].includes(action)) show = false;
                     // 在项目内部（包括项目根目录和文件夹内）不能添加项目
                     if (action === 'addProject' && currentProject) show = false;
                 }
@@ -2197,6 +2216,12 @@
                 if (contextTarget) openItem({ id: contextTarget.id, type: contextTarget.type });
             } else if (action === 'download') {
                 if (contextTarget && contextTarget.type === 'file') downloadFile(contextTarget.id);
+            } else if (action === 'rename') {
+                if (contextTarget) renameItem(contextTarget.type, contextTarget.id);
+            } else if (action === 'copyUrl') {
+                if (contextTarget && contextTarget.type === 'file') copyFileUrl(contextTarget.id);
+            } else if (action === 'properties') {
+                if (contextTarget) showProperties(contextTarget.type, contextTarget.id);
             } else if (action === 'addFile') {
                 showAddFile();
             } else if (action === 'addFolder') {
@@ -2207,6 +2232,95 @@
                 if (selectedItems.length > 0) deleteSelected();
                 else if (contextTarget) deleteItem(contextTarget.type, contextTarget.id);
             }
+        }
+
+        async function renameItem(type, id) {
+            if (!isAdmin) return;
+            let currentName = '';
+            if (type === 'project') {
+                const project = allProjects.find(p => p.id === id);
+                currentName = project ? project.name : '';
+            } else if (type === 'folder') {
+                currentName = folderMap[id] ? folderMap[id].name : '';
+            } else if (type === 'file') {
+                const file = currentItems.find(i => i.id === id && i.type === 'file');
+                currentName = file ? file.name : '';
+            }
+            showModal('重命名', `请输入新的${type === 'project' ? '项目' : type === 'folder' ? '文件夹' : '文件'}名称`, async (newName) => {
+                try {
+                    if (type === 'project') {
+                        await apiPatch(`/api/projects/${id}`, { name: newName });
+                        loadProjects();
+                    } else if (type === 'folder') {
+                        await apiPatch(`/api/folders/${id}`, { name: newName });
+                        refreshFolderTree(currentProject, currentFolder);
+                        await loadContents();
+                    } else if (type === 'file') {
+                        await apiPatch(`/api/files/${id}`, { name: newName });
+                        await loadContents();
+                    }
+                    showToast('重命名成功', 'success');
+                } catch (err) {
+                    showToast('重命名失败', 'error');
+                }
+            }, currentName);
+        }
+
+        async function copyFileUrl(id) {
+            try {
+                const file = await apiGet(`/api/files/${id}`);
+                const url = window.location.origin + file.url;
+                await navigator.clipboard.writeText(url);
+                showToast('文件地址已复制', 'success');
+            } catch (err) {
+                showToast('复制失败', 'error');
+            }
+        }
+
+        async function showProperties(type, id) {
+            let info = [];
+            if (type === 'project') {
+                const project = allProjects.find(p => p.id === id);
+                if (project) {
+                    info = [
+                        ['类型', '项目'],
+                        ['名称', project.name],
+                        ['创建时间', formatDate(project.created_at)]
+                    ];
+                }
+            } else if (type === 'folder') {
+                const folder = folderMap[id];
+                if (folder) {
+                    info = [
+                        ['类型', '文件夹'],
+                        ['名称', folder.name],
+                        ['创建时间', formatDate(folder.created_at)]
+                    ];
+                }
+            } else if (type === 'file') {
+                try {
+                    const file = await apiGet(`/api/files/${id}`);
+                    info = [
+                        ['类型', '文件'],
+                        ['名称', file.name],
+                        ['大小', formatSize(file.size)],
+                        ['MIME类型', file.type || '-'],
+                        ['创建时间', formatDate(file.created_at)],
+                        ['地址', window.location.origin + file.url]
+                    ];
+                } catch (err) {
+                    showToast('获取属性失败', 'error');
+                    return;
+                }
+            }
+            const content = info.map(([k, v]) => `<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border)"><span style="color:var(--text-secondary)">${k}</span><span style="font-weight:500">${escapeHtml(String(v))}</span></div>`).join('');
+            showConfirmModal(`<div style="min-width:280px">${content}</div>`, () => {});
+        }
+
+        function formatDate(dateStr) {
+            if (!dateStr) return '-';
+            const d = new Date(dateStr);
+            return isNaN(d) ? dateStr : d.toLocaleString('zh-CN');
         }
 
         // ==================== CRUD Operations ====================
@@ -2359,9 +2473,9 @@
             }
         }
 
-        async function deleteItem(type, id) {
+        async function deleteItem(type, id, skipConfirm = false) {
             if (!isAdmin) return;
-            if (!confirm('确定要删除吗?')) return;
+            if (!skipConfirm && !confirm('确定要删除吗?')) return;
             try {
                 if (type === 'project') {
                     await apiDelete(`/api/projects/${id}`);
@@ -2398,7 +2512,7 @@
         function deleteSelected() {
             if (!isAdmin || selectedItems.length === 0) return;
             if (!confirm(`确定要删除选中的 ${selectedItems.length} 个项目吗?`)) return;
-            selectedItems.forEach(item => deleteItem(item.type, item.id));
+            selectedItems.forEach(item => deleteItem(item.type, item.id, true));
             selectedItems = [];
         }
 
@@ -2407,11 +2521,11 @@
         }
 
         // ==================== Modals ====================
-        function showModal(title, placeholder, callback) {
+        function showModal(title, placeholder, callback, defaultValue) {
             document.getElementById('modalTitle').textContent = title;
             const input = document.getElementById('modalInput');
             input.placeholder = placeholder || '请输入名称';
-            input.value = '';
+            input.value = defaultValue || '';
             input.classList.remove('hidden');
             document.getElementById('modalPassword').classList.add('hidden');
             document.getElementById('modalFile').classList.add('hidden');
@@ -2420,7 +2534,7 @@
             document.getElementById('modalConfirmBtn').textContent = '确定';
             modalCallback = callback;
             modalMode = 'input';
-            setTimeout(() => input.focus(), 100);
+            setTimeout(() => input.select(), 100);
         }
 
         function showPasswordModal(title, callback) {

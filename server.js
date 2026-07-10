@@ -21,6 +21,16 @@ const dataDir = path.join(STORAGE_ROOT, 'data');
 if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
 if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir, { recursive: true });
 
+// 修复文件名编码问题（处理 UTF-8 被当作 Latin-1 的情况）
+function fixFilename(name) {
+    if (!name) return name;
+    try {
+        return Buffer.from(name, 'latin1').toString('utf8');
+    } catch (e) {
+        return name;
+    }
+}
+
 // 数据文件路径
 const DATA_FILE = path.join(dataDir, 'db.json');
 
@@ -180,7 +190,8 @@ const storage = multer.diskStorage({
     },
     filename: function (req, file, cb) {
         const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-        cb(null, uniqueSuffix + '-' + file.originalname);
+        const fixedName = fixFilename(file.originalname);
+        cb(null, uniqueSuffix + '-' + fixedName);
     }
 });
 const upload = multer({ storage: storage });
@@ -289,31 +300,63 @@ app.delete('/api/folders/:id', (req, res) => {
     res.json({ message: '文件夹已删除' });
 });
 
-// 移动文件夹
+// 移动或重命名文件夹
 app.patch('/api/folders/:id', (req, res) => {
     const data = initData();
     const folderId = parseInt(req.params.id);
-    const { parent_folder_id } = req.body;
+    const { parent_folder_id, name } = req.body;
     const folder = data.folders.find(f => f.id === folderId);
     if (!folder) return res.status(404).json({ error: '文件夹不存在' });
-    // 防止移动到自身或其子文件夹中
-    if (parent_folder_id === folderId) {
-        return res.status(400).json({ error: '不能移动到自身' });
-    }
-    function isDescendant(parentId, childId) {
-        const children = data.folders.filter(f => f.parent_folder_id === parentId);
-        for (const child of children) {
-            if (child.id === childId) return true;
-            if (isDescendant(child.id, childId)) return true;
+    if (parent_folder_id !== undefined) {
+        // 防止移动到自身或其子文件夹中
+        if (parent_folder_id === folderId) {
+            return res.status(400).json({ error: '不能移动到自身' });
         }
-        return false;
+        function isDescendant(parentId, childId) {
+            const children = data.folders.filter(f => f.parent_folder_id === parentId);
+            for (const child of children) {
+                if (child.id === childId) return true;
+                if (isDescendant(child.id, childId)) return true;
+            }
+            return false;
+        }
+        if (parent_folder_id && isDescendant(folderId, parseInt(parent_folder_id))) {
+            return res.status(400).json({ error: '不能移动到子文件夹中' });
+        }
+        folder.parent_folder_id = parent_folder_id ? parseInt(parent_folder_id) : null;
     }
-    if (parent_folder_id && isDescendant(folderId, parseInt(parent_folder_id))) {
-        return res.status(400).json({ error: '不能移动到子文件夹中' });
-    }
-    folder.parent_folder_id = parent_folder_id ? parseInt(parent_folder_id) : null;
+    if (name !== undefined) folder.name = name;
     saveData(data);
     res.json(folder);
+});
+
+// 重命名项目
+app.patch('/api/projects/:id', (req, res) => {
+    const data = initData();
+    const projectId = parseInt(req.params.id);
+    const { name } = req.body;
+    const project = data.projects.find(p => p.id === projectId);
+    if (!project) return res.status(404).json({ error: '项目不存在' });
+    if (name !== undefined) project.name = name;
+    saveData(data);
+    res.json(project);
+});
+
+// 移动或重命名文件
+app.patch('/api/files/:id', (req, res) => {
+    const data = initData();
+    const fileId = parseInt(req.params.id);
+    const { parent_id, parent_type, name } = req.body;
+    const file = data.files.find(f => f.id === fileId);
+    if (!file) return res.status(404).json({ error: '文件不存在' });
+    if (parent_id !== undefined) file.parent_id = parseInt(parent_id);
+    if (parent_type !== undefined) file.parent_type = parent_type;
+    if (name !== undefined) {
+        file.name = name;
+        file.original_name = name;
+    }
+    saveData(data);
+    res.json(file);
 });
 
 // 获取文件列表
@@ -331,32 +374,33 @@ app.post('/api/files', upload.single('file'), async (req, res) => {
     if (!file) {
         return res.status(400).json({ error: '没有上传文件' });
     }
-    
+
     try {
+        const fixedName = fixFilename(file.originalname);
         let downloadUrl = null;
-        
+
         if (GITHUB_TOKEN) {
             // 有 Token 时推送到 GitHub
             const fileContent = fs.readFileSync(file.path);
             const base64Content = fileContent.toString('base64');
-            downloadUrl = await uploadToGitHub(file.originalname, base64Content);
+            downloadUrl = await uploadToGitHub(fixedName, base64Content);
             // 删除临时文件
             try { fs.unlinkSync(file.path); } catch(e) {}
         } else {
             // 没有 Token 时保存到本地 storage 目录
             const localDir = path.join(STORAGE_ROOT, 'files');
             if (!fs.existsSync(localDir)) fs.mkdirSync(localDir, { recursive: true });
-            const localPath = path.join(localDir, file.originalname);
+            const localPath = path.join(localDir, fixedName);
             fs.renameSync(file.path, localPath);
-            downloadUrl = `/local-files/${encodeURIComponent(file.originalname)}`;
+            downloadUrl = `/local-files/${encodeURIComponent(fixedName)}`;
         }
-        
+
         const data = initData();
         const { parent_id, parent_type } = req.body;
         const fileRecord = {
             id: data.nextId.file++,
-            name: file.originalname,
-            original_name: file.originalname,
+            name: fixedName,
+            original_name: fixedName,
             url: downloadUrl,
             size: file.size,
             type: file.mimetype,
@@ -364,7 +408,7 @@ app.post('/api/files', upload.single('file'), async (req, res) => {
             parent_type: parent_type,
             created_at: new Date().toISOString()
         };
-        
+
         data.files.push(fileRecord);
         saveData(data);
         res.json(fileRecord);
@@ -376,15 +420,15 @@ app.post('/api/files', upload.single('file'), async (req, res) => {
     }
 });
 
-// 本地文件下载
+// 本地文件下载（Express 已自动解码 URL 参数，不需要再 decodeURIComponent）
 app.get('/local-files/:filename', (req, res) => {
     try {
-    const filePath = path.join(STORAGE_ROOT, 'files', decodeURIComponent(req.params.filename));
-    if (fs.existsSync(filePath)) {
-        res.sendFile(filePath);
-    } else {
-        res.status(404).json({ error: '文件不存在' });
-    }
+        const filePath = path.join(STORAGE_ROOT, 'files', req.params.filename);
+        if (fs.existsSync(filePath)) {
+            res.sendFile(filePath);
+        } else {
+            res.status(404).json({ error: '文件不存在' });
+        }
     } catch (err) {
         console.error('local-files error:', err);
         res.status(500).json({ error: '文件读取失败' });
