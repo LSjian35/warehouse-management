@@ -2051,6 +2051,8 @@
         function openItem(item) {
             if (item.type === 'folder') {
                 navigateTo(currentProject, item.id);
+            } else if (item.type === 'project') {
+                navigateTo(item.id, null);
             } else {
                 previewFile(item.id);
             }
@@ -2241,6 +2243,7 @@
         }
 
         async function handleFolderUpload(folderName, files) {
+            console.log('[handleFolderUpload] 开始上传文件夹:', folderName, '文件数:', files.length);
             const payload = { name: folderName, project_id: currentProject };
             if (currentFolder) payload.parent_folder_id = currentFolder;
             try {
@@ -2251,13 +2254,14 @@
                 // 解析所有文件路径，按目录分组
                 const dirToFiles = {};
                 for (const file of files) {
-                    const relativePath = file.webkitRelativePath;
-                    const parts = relativePath.split('/');
+                    const relativePath = file.webkitRelativePath || file.name;
+                    const parts = relativePath.split(/[\\/]/);
                     // parts[0] = 根文件夹名, parts[last] = 文件名, 中间是子目录
                     const dirPath = parts.slice(1, -1).join('/');
                     if (!dirToFiles[dirPath]) dirToFiles[dirPath] = [];
                     dirToFiles[dirPath].push(file);
                 }
+                console.log('[handleFolderUpload] 目录分组:', Object.keys(dirToFiles));
 
                 // 创建所有需要的子文件夹（按深度排序确保父文件夹先创建）
                 const dirs = Object.keys(dirToFiles).filter(d => d !== '').sort((a, b) => a.split('/').length - b.split('/').length);
@@ -2278,6 +2282,7 @@
                 let failedCount = 0;
                 for (const [dirPath, fileList] of Object.entries(dirToFiles)) {
                     const parentId = createdFolders[dirPath] || rootFolder.id;
+                    console.log('[handleFolderUpload] 上传目录:', dirPath || '(根)', '文件数:', fileList.length, 'parentId:', parentId);
                     for (const file of fileList) {
                         const formData = new FormData();
                         formData.append('file', file);
@@ -2285,9 +2290,16 @@
                         formData.append('parent_type', 'folder');
                         try {
                             const response = await fetch(API_BASE + '/api/files', { method: 'POST', body: formData });
-                            if (response.ok) uploadedCount++;
-                            else failedCount++;
+                            console.log('[handleFolderUpload] 上传结果:', file.name, '状态:', response.status, 'ok:', response.ok);
+                            if (response.ok) {
+                                uploadedCount++;
+                            } else {
+                                const text = await response.text();
+                                console.error('[handleFolderUpload] 上传失败:', file.name, text);
+                                failedCount++;
+                            }
                         } catch (e) {
+                            console.error('[handleFolderUpload] 上传异常:', file.name, e.message);
                             failedCount++;
                         }
                     }
@@ -2301,6 +2313,7 @@
                     showToast(`文件夹上传成功，共 ${uploadedCount} 个文件`, 'success');
                 }
             } catch (err) {
+                console.error('[handleFolderUpload] 整体错误:', err);
                 showToast('上传失败: ' + err.message, 'error');
             }
         }
@@ -2445,7 +2458,7 @@
             modalCallback = null;
         }
 
-        function confirmModal() {
+        async function confirmModal() {
             if (modalMode === 'password') {
                 const pwd = document.getElementById('modalPassword');
                 if (modalCallback && pwd.value.trim()) {
@@ -2463,17 +2476,21 @@
                 const name = input.value.trim();
                 if (folderUpload.files && folderUpload.files.length > 0) {
                     const folderName = name || folderUpload.files[0].webkitRelativePath.split('/')[0];
-                    handleFolderUpload(folderName, folderUpload.files);
+                    const fileList = Array.from(folderUpload.files);
+                    await handleFolderUpload(folderName, fileList);
                     closeModal();
                 } else if (name) {
                     const payload = { name, project_id: currentProject };
                     if (currentFolder) payload.parent_folder_id = currentFolder;
-                    apiPost('/api/folders', payload).then((folder) => {
+                    try {
+                        const folder = await apiPost('/api/folders', payload);
                         folderMap[folder.id] = folder;
                         refreshFolderTree(currentProject, currentFolder);
                         loadContents();
                         showToast('文件夹已创建', 'success');
-                    }).catch(() => showToast('创建失败', 'error'));
+                    } catch(e) {
+                        showToast('创建失败', 'error');
+                    }
                     closeModal();
                 }
             } else {
