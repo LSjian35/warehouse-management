@@ -552,10 +552,13 @@ app.patch('/api/files/:id', (req, res) => {
     res.json(file);
 });
 
-// 管理员登录验证（密码不暴露在前端）
+// 管理员登录验证（密码必须从环境变量读取，不要硬编码）
 app.post('/api/admin/login', (req, res) => {
     const { password } = req.body;
-    const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || '59880723';
+    const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
+    if (!ADMIN_PASSWORD) {
+        return res.status(500).json({ success: false, error: '服务器未配置管理员密码' });
+    }
     if (password === ADMIN_PASSWORD) {
         res.json({ success: true });
     } else {
